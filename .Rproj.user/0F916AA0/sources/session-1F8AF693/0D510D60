@@ -1,0 +1,27 @@
+{
+    "id": "0D510D60",
+    "path": "~/MICROP/Els/Els/beta_div.R",
+    "project_path": "beta_div.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1688117254944.0,
+    "source_on_save": false,
+    "relative_order": 1,
+    "properties": {
+        "tempName": "Untitled1",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "518,35",
+        "scrollLine": "496"
+    },
+    "folds": "145|39|188|0|\n148|48|156|2|\n205|57|251|0|\n267|61|281|0|\n",
+    "lastKnownWriteTime": 1690458042,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1690458042860,
+    "read_only": false,
+    "read_only_alternatives": []
+}

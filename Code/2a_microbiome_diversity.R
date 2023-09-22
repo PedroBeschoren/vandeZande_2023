@@ -381,16 +381,48 @@ pairwise_ft<-flextable(pairwise_permanova_df)
 save_as_docx(pairwise_ft,
              path = "./Results/pairwise_PERMANOVA_tables.docx")
 
-# filter df
-control_df<-filter(pairwise_permanova_df, treatment_1 =="Control" | treatment_2 == "Control" )
-control_df$combination<-as.factor(control_df$combination)
 
-#line 
-control_comparison_lineplot<-
-ggplot(control_df, aes(x = Time ,y = R2))+
-  geom_line(aes(color = combination))+
-  facet_wrap(~Site)+
-  theme_bw()
+# filter df to make many plots
+Control_df<-filter(pairwise_permanova_df, treatment_1 =="Control" | treatment_2 == "Control" )
+Chitin_df<-filter(pairwise_permanova_df, treatment_1 =="Chitin" | treatment_2 == "Chitin" )
+Manure_df<-filter(pairwise_permanova_df, treatment_1 =="Manure" | treatment_2 == "Manure" )
+BSF_df<-filter(pairwise_permanova_df, treatment_1 =="BSF" | treatment_2 == "BSF" )
+MW_df<-filter(pairwise_permanova_df, treatment_1 =="MW" | treatment_2 == "MW" )
+HC_df<-filter(pairwise_permanova_df, treatment_1 =="HC" | treatment_2 == "HC" )
+
+
+# line plot with one focal comparson at a time 
+ggarrange(
+  ggplot(Control_df, aes(x = Time ,y = R2))+
+    geom_line(aes(color = combination))+
+    facet_wrap(~Site)+
+    theme_bw(),
+  ggplot(Chitin_df, aes(x = Time ,y = R2))+
+    geom_line(aes(color = combination))+
+    facet_wrap(~Site)+
+    theme_bw(),
+  ggplot(Manure_df, aes(x = Time ,y = R2))+
+    geom_line(aes(color = combination))+
+    facet_wrap(~Site)+
+    theme_bw(),
+  ggplot(BSF_df, aes(x = Time ,y = R2))+
+    geom_line(aes(color = combination))+
+    facet_wrap(~Site)+
+    theme_bw(),
+  ggplot(MW_df, aes(x = Time ,y = R2))+
+    geom_line(aes(color = combination))+
+    facet_wrap(~Site)+
+    theme_bw(),
+  ggplot(HC_df, aes(x = Time ,y = R2))+
+    geom_line(aes(color = combination))+
+    facet_wrap(~Site)+
+    theme_bw(), ncol = 1)
+
+
+
+
+
+
 
 
 ggsave(control_comparison_lineplot, filename = "./Results/control_comparison_lineplot_pairwise_permanova_microbiome.pdf",

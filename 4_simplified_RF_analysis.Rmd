@@ -1,0 +1,323 @@
+---
+title: "3_time_serias_mia_package"
+author: "Pedro Beschoren da Costa"
+date: "2023-08-14"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# load
+```{r}
+
+library(phyloseq)
+library(vegan)
+library(dplyr)
+library(ggplot2)
+library(metagMisc)
+library(ggpubr)
+library(plyr)
+library(dplyr)
+library(Boruta)
+library(tibble)
+library(metacoder)
+
+source("./Code/Machine_Learning_custom_functions.R") # source
+
+
+load(file = "./Data/physeq_rarefied_soiltype_l.RData")
+
+
+
+
+```
+
+# RF for for time
+```{r}
+# rename object to avoid copy-paste previosu code issues
+ps_sp_l<-physeq_rarefied_soiltype_l
+
+# find ASVs taht differentiate the time points
+t0<-Sys.time()
+set.seed(101)
+Boruta_time_l<-lapply(ps_sp_l, function (x) #parLapply wil do a parallel lapply on the defined cluster
+  Boruta(Time_point~.,   # classification you are trying to predict
+         data = single_physeq_to_borutaInput(physeq_object =x,
+                                             variable_to_be_classified = "Time_point")[,-1], # removes first column, "sample" as a predictor variable
+         doTrace=0,
+         maxRuns = 200,  #increase the maximum number of runs to decrease the number of tenttively important OTUs.
+         ntree = 10000)) # increase the number of trees to increase precision. decrease ntree/maxruns to reduce computational time.
+t1<-Sys.time()
+t0-t1
+
+save(Boruta_time_l, file = "./Results/Boruta_time_l.RData")
+         
+
+
+```
+
+
+# RF for treatment
+```{r}
+
+
+# find ASVs taht differentiate the time points
+t0<-Sys.time()
+set.seed(101)
+Boruta_Treatment_l<-lapply(ps_sp_l, function (x) #parLapply wil do a parallel lapply on the defined cluster
+  Boruta(Treatment~.,   # classification you are trying to predict
+         data = single_physeq_to_borutaInput(physeq_object =x,
+                                             variable_to_be_classified = "Treatment")[,-1], # removes first column, "sample" as a predictor variable
+         doTrace=0,
+         maxRuns = 200,  #increase the maximum number of runs to decrease the number of tenttively important OTUs.
+         ntree = 10000)) # increase the number of trees to increase precision. decrease ntree/maxruns to reduce computational time.
+t1<-Sys.time()
+t0-t1
+
+save(Boruta_Treatment_l, file = "./Results/Boruta_Treatment_l.RData")
+
+         
+
+
+```
+
+
+
+
+#fix boruta, save as PS
+```{r}
+
+#put both boruta objects into a single list
+Boruta_l<-c(Boruta_time_l,Boruta_Treatment_l)
+names(Boruta_l)<-c("Time_Field", "Time_pot", "Treatment_field", "Treatment_pot")
+
+#fixed boruta
+fixed_Boruta_l<-lapply(Boruta_l, TentativeRoughFix)
+
+#RF aSVs
+fixed_Boruta_ASV_l<-lapply(fixed_Boruta_l, getSelectedAttributes)
+
+# ps with RF ASVs
+ps_RF_ASVs<-
+  c(prune_taxa(taxa = fixed_Boruta_ASV_l$Time_Field,
+           x = physeq_rarefied_soiltype_l$Field),
+    prune_taxa(taxa = fixed_Boruta_ASV_l$Time_pot,
+           x = physeq_rarefied_soiltype_l$Pot),
+    prune_taxa(taxa = fixed_Boruta_ASV_l$Treatment_field,
+           x = physeq_rarefied_soiltype_l$Field),
+    prune_taxa(taxa = fixed_Boruta_ASV_l$Treatment_pot,
+           x = physeq_rarefied_soiltype_l$Pot))
+
+#adjsut names
+names(ps_RF_ASVs)<-names(fixed_Boruta_ASV_l)
+
+
+
+
+```
+
+
+
+
+```{r}
+# define function for plotting:
+phyloseq_to_heat_tree<-function(ps_object, sample_group){
+  
+  # this function output is a heat tree comparing metadata. the input is based on a phyloseq object
+  
+  # ps object =  a phyloseq object, containing sample metadata, OTU table, and taxonomy table
+  # sample_group = the name of a column in your metadata that you want to compare in the heat tree. it has to be quoted.
+  
+  # this function will create a matrix of heat trees if your metadata has more than 2 groups. it should fail if it has only 1 group
+  
+  
+#exchange species info per ASV ID
+ps_object@tax_table[,7]<-taxa_names(ps_object)
+
+
+#remove unnecessary taxonomic info (dada2id, "s__" and "ASV_id) by updating the tax table with a subset of the tax table
+tax_table(ps_object)<-tax_table(ps_object)[,1:7]
+
+
+# let's remove the "r__"ranks from the taxonomy, they can be useful but will pollute our plot
+tax_table(ps_object)[, colnames(tax_table(ps_object))] <- gsub(pattern = "[a-z]__", # regular expression pattern to search for
+                                                                   x = tax_table(ps_object)[, colnames(tax_table(ps_object))], # "df"
+                                                                   replacement = "") # replacement for pattern
+# transform from phyloseq to taxmap object
+taxmap_obj<-parse_phyloseq(ps_object)
+
+#get abundance per taxon
+taxmap_obj$data$tax_abund<-calc_taxon_abund(obj = taxmap_obj, 
+                                      data = "otu_table",
+                                      cols = taxmap_obj$data$sample_data$sample_id) 
+
+#get occurrence of ASVs per treatment
+# the sample groups needs some wrangling to fit within the soft code of the function
+taxmap_obj$data$tax_occ<- calc_n_samples(obj = taxmap_obj, 
+                                                      data = "tax_abund", 
+                                                      cols = taxmap_obj$data$sample_data$sample_id,
+                                                      groups = taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]]) 
+
+# calculate log2 median ratios and p values for a wilcoxcon test within taxas in this stress treatment groups
+# the sample groups needs some wrangling to fit within the soft code of the function
+taxmap_obj$data$diff_table <- compare_groups(obj = taxmap_obj,
+                                                        data = "tax_abund",
+                                                        cols = taxmap_obj$data$sample_data$sample_id, 
+                                                        groups = taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]]) 
+
+
+# define number of compared factors
+factors_compared<-taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]] 
+
+# draw the plot based on an if else statement: if there are 2 groups, plot a a heat tree comparing abundances between both groups, else plot a matrix of ehat trees. this function will fail if you only have 1 sample group! 
+
+if (length(unique(factors_compared)) == 2) {
+
+set.seed(1)
+ output<- taxmap_obj %>%
+heat_tree(
+            node_label = taxon_names,
+            node_size = n_obs,
+            node_color = log2_median_ratio,
+            node_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+            node_color_range = c("cyan", "gray", "tan"), # The color palette used
+            layout = "davidson-harel",
+            node_color_axis_label = paste0("log2 median; tan", 
+                                           taxmap_obj$data$diff_table$treatment_1[1], 
+                                           "cyan", 
+                                           taxmap_obj$data$diff_table$treatment_2[1],
+                                           sep = " "),
+            initial_layout = "reingold-tilford")
+
+ } else {
+
+set.seed(1)
+output<-heat_tree_matrix(taxmap_obj,
+                         data = "diff_table", # this is the table with the data you want to plot
+                         node_size = n_obs, # n_obs is a function that calculates, in this case, the number of OTUs per taxon
+                         node_label = taxon_names,
+                         node_color = log2_median_ratio, # A column from `taxmap_obj$data$diff_table_3treatments`
+                         node_color_range = diverging_palette(), # The built-in palette for diverging data
+                         node_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+                         edge_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+                         node_size_axis_label = "Number of OTUs",
+                         node_color_axis_label = "Log2 ratio median proportions",
+                         layout = "davidson-harel", # The primary layout algorithm
+                         initial_layout = "reingold-tilford") # The layout algorithm that initializes node locations
+
+   
+   
+ }
+
+
+# clearly define the output object you will get from the function
+return(output)   
+
+
+}
+
+#creat heat trees
+heat_tree_time<-
+  lapply(ps_RF_ASVs[1:2], function(x)
+    phyloseq_to_heat_tree(ps_object = x, sample_group = "Time_point"))
+
+
+heat_tree_treatment<-
+  lapply(ps_RF_ASVs[3:4], function(x)
+    phyloseq_to_heat_tree(ps_object = x, sample_group = "Treatment"))
+
+#export as pdf
+ggsave(plot = heat_tree_time$Time_Field, filename = "./Results/RF_Heattree_Time_Field.pdf")
+ggsave(plot = heat_tree_time$Time_pot, filename = "./Results/RF_Heattree_Time_pot.pdf")
+ggsave(plot = heat_tree_treatment$Treatment_field, filename = "./Results/RF_Heattree_Treatment_Field.pdf")
+ggsave(plot = heat_tree_treatment$Treatment_pot, filename = "./Results/RF_Heattree_Treatment_pot.pdf")
+
+
+```
+
+
+
+# explore taxonomy and importance of features
+```{r}
+
+#df with ASV importance
+RF_importance_df_l<-
+lapply(fixed_Boruta_l, function(x)
+  dplyr::filter(attStats(x), decision == "Confirmed"))
+
+
+# define a function to extract  mean importance and linear biomass correlations of each taxonomy of the ASVs selected by the random forest
+Importance_per_taxon<-function(ps, ASV_stats_boruta){
+  
+  confirmed_ASV<-rownames(ASV_stats_boruta)
+  
+imp_ps<-prune_taxa(taxa = confirmed_ASV, x = ps) 
+
+imp_melted<-psmelt(imp_ps)
+
+to_merge<-rownames_to_column(ASV_stats_boruta[,1:2], var = "OTU")
+
+imp_melted<-left_join(imp_melted, to_merge, by ="OTU")
+
+phylum_table<-imp_melted%>%
+  group_by(Phylum)%>%
+  dplyr::summarize(mean_imp = mean(meanImp),
+            imp_sd = sd(meanImp),
+            n=n()/nsamples(ps))%>%
+  dplyr::arrange(desc(n))%>%as.data.frame()
+
+class_table<-imp_melted%>%
+  group_by(Class)%>%
+  dplyr::summarize(mean_imp = mean(meanImp),
+            imp_sd = sd(meanImp),
+            n=n()/nsamples(ps))%>%
+  dplyr::arrange(desc(n))%>%as.data.frame()
+
+order_table<-imp_melted%>%
+  group_by(Order)%>%
+  dplyr::summarize(mean_imp = mean(meanImp),
+            imp_sd = sd(meanImp),
+            n=n()/nsamples(ps))%>%
+  dplyr::arrange(desc(n))%>%as.data.frame()
+
+           
+family_table<-imp_melted%>%
+  group_by(Family)%>%
+  dplyr::summarize(mean_imp = mean(meanImp),
+            imp_sd = sd(meanImp),
+            n=n()/nsamples(ps))%>%
+  dplyr::arrange(desc(n))%>%as.data.frame()
+
+genus_table<-imp_melted%>%
+  group_by(Genus)%>%
+  dplyr::summarize(mean_imp = mean(meanImp),
+            imp_sd = sd(meanImp),
+            n=n()/nsamples(ps))%>%
+  dplyr::arrange(desc(n))%>%as.data.frame()
+
+output<-list("phylum_table" = phylum_table,
+             "class_table" = class_table,
+             "order_table" = order_table,
+             "family_table" = family_table,
+             "genus_table" = genus_table)
+return(output)
+
+}
+
+# execute custom function on list of boruta and ps obejcts
+importance_per_taxonomy<-mapply(function(x,y)
+  Importance_per_taxon(ps = x,ASV_stats_boruta = y),
+  x = ps_RF_ASVs,
+  y = RF_importance_df_l,
+  SIMPLIFY = FALSE)
+
+
+#export this table as txt
+capture.output(importance_per_taxonomy, file = "./Results/RF_importance_per_taxonomy.txt")
+
+```
+
+
+
+

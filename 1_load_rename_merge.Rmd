@@ -1,0 +1,180 @@
+---
+title: "1_preprocessing_merging_normalization"
+author: "Pedro Beschoren da Costa"
+date: "2023-08-10"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# load libraries
+```{r}
+library(phyloseq)
+library(vegan)
+library(dplyr)
+library(ggplot2)
+library(metagMisc)
+library(ggpubr)
+library(plyr)
+library(miaTime)
+library(knitr)
+library(mia)
+library(tidyr)
+
+```
+
+
+# load microbiome data
+```{r}
+
+#load  field biom file 
+physeq_field <- import_biom("./Data/featureTable_field.biom", refseqfilename = "./Data/feature_field.fasta")
+physeq_field@refseq
+
+# load taxonomy file - field
+field_taxonomy<-read.table("./Data/feature.tax_assignments_field.txt", header = FALSE, row.names = 1)
+
+# separate columns by semicolumn
+field_taxonomy_sep<-
+  separate_wider_delim(data = field_taxonomy,
+                       cols = "V2",
+                       delim = ";",
+                       names = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"),
+                       too_few = "align_start")%>%as.matrix()
+
+# adjsut row and column names
+rownames(field_taxonomy_sep)<-rownames(field_taxonomy)
+colnames(field_taxonomy_sep)[8]<-"Confidence"
+
+# move to ps object
+field_taxonomy_ps<-tax_table(field_taxonomy_sep)
+tax_table(physeq_field)<-field_taxonomy_ps
+                       
+
+
+
+
+
+#load  pot biom file 
+physeq_pot <- import_biom("./Data/featureTable_pot.biom", refseqfilename = "./Data/feature_pot.fasta")
+
+# load taxonomy file - pot
+pot_taxonomy<-read.table("./Data/feature.tax_assignments_pot.txt", header = FALSE, row.names = 1)
+
+# separate columns by semicolumn
+pot_taxonomy_sep<-
+  separate_wider_delim(data = pot_taxonomy,
+                       cols = "V2",
+                       delim = ";",
+                       names = c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species"),
+                       too_few = "align_start")%>%as.matrix()
+
+# adjsut row and column names
+rownames(pot_taxonomy_sep)<-rownames(pot_taxonomy)
+colnames(pot_taxonomy_sep)[8]<-"Confidence"
+
+# move to ps object
+pot_taxonomy_ps<-tax_table(pot_taxonomy_sep)
+tax_table(physeq_pot)<-pot_taxonomy_ps
+
+
+
+```
+
+# load reference sequences, define new ASV names of merged reference sequence object
+```{r}
+
+# load reference sequences
+field_fasta<-readDNAStringSet(filepath = "./Data/feature_field.fasta")
+
+pot_fasta<-readDNAStringSet(filepath = "./Data/feature_pot.fasta")
+
+names(field_fasta)<-NULL
+names(pot_fasta)<-NULL
+
+merged_refseq_unique<-c(field_fasta, pot_fasta)%>%unique()
+
+names(merged_refseq_unique)<-paste0("ASV_", 1:length(merged_refseq_unique))
+
+
+
+
+# adjust taxa names in field samples
+old_names_field<-names(merge(refseq(physeq_field),merged_refseq_unique))#old names
+new_names_field<-names(merge(merged_refseq_unique, refseq(physeq_field))) #new names
+
+
+# adjust taxa names in pot samples
+old_names_pot<-names(merge(refseq(physeq_pot),merged_refseq_unique))#old names
+new_names_pot<-names(merge(merged_refseq_unique, refseq(physeq_pot))) #new names
+
+```
+
+# update  taxa names of original phyloseq object with the merged ASV names
+wihtout this fix, macrogen's output gives us unique DNA sequences with more than one ASV name, and one ASV name with more than one unique DNA sequences
+```{r}
+
+
+old_names_field[order(match(old_names_field,taxa_names(physeq_field)))] # old names, ordered
+new_names_field_ordered<-new_names_field[order(match(old_names_field,taxa_names(physeq_field)))] # new names, ordered
+tail(new_names_field_ordered)
+
+physeq_field_newnames<-physeq_field
+
+taxa_names(physeq_field_newnames)<-new_names_field_ordered
+
+
+
+
+old_names_pot[order(match(old_names_pot,taxa_names(physeq_pot)))] # old names, ordered
+new_names_pot_ordered<-new_names_pot[order(match(old_names_pot,taxa_names(physeq_pot)))] # new names, ordered
+tail(new_names_pot_ordered)
+
+physeq_pot_newnames<-physeq_pot
+
+taxa_names(physeq_pot_newnames)<-new_names_pot_ordered
+
+```
+# check if ASV sequences are identical between the original old ASV names and the new, merged ASV names
+```{r}
+physeq_field_newnames
+physeq_field
+
+# ASVs are equal between both
+physeq_field_newnames@refseq
+physeq_field@refseq
+table(physeq_field_newnames@refseq == physeq_field@refseq) # retuns number of ASVs that match ebtween both version fo the same object
+which(!physeq_field_newnames@refseq == physeq_field@refseq) # returns zero unequal aSVs
+
+
+table(physeq_pot_newnames@refseq == physeq_pot@refseq)  # retuns number of ASVs that match ebtween both version fo the same object
+which(!physeq_pot_newnames@refseq == physeq_pot@refseq) # returns zero unequal aSVs
+
+
+# finally, merge phyloseq objects with unique btu shared ASVs names
+physeq<-merge_phyloseq(physeq_pot_newnames, physeq_field_newnames)
+
+
+
+```
+
+# add sample metadata
+```{r}
+
+
+#laod metadata
+metadata <- read.csv2(file = "./Data/metadata.csv", row.names = 3)
+metadata$Time_point<-factor(x = metadata$Time_point, levels = c("Week.4", "Week.8", "Week.12", "Week.16"))
+metadata <-sample_data(metadata)
+
+# add metadata to phyloseq object with updated taxa names
+sample_data(physeq)<-metadata
+
+#save the phyloseq object externally
+save(physeq, file = "./Data/physeq_merged_renamed_pot_field_ASVs.RData")
+
+
+
+
+```
+

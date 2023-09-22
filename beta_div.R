@@ -11,75 +11,15 @@ library(miaTime)
 library(knitr)
 library(mia)
 
-# pacakge for microbiome time series: https://microbiome.github.io/miaTime/
+########## load and prepare ####
 
+# load phyloseq object with adjsuted and emrged ASV names (fixing macrogen's inadequate bioinformatics)
+load(file = "./Data/physeq_merged_renamed_pot_field_ASVs.RData")
+physeq
 
-#load inssect data
-insect<-read.csv2(file = "./Data/Data_Sheets_exuviae_observations_complete1.csv")
-
-#remove NA
-insect<-na.omit(insect)
-insect<-insect[complete.cases(insect), ]
-
-#subset
-insect_metadata<-(insect[,1:8])
-
-#transform to pyoseq
-insect_ps<-sample_data(insect_metadata)
-
-#load insect species table and save as phyloseq
-insect_sp<-insect[,9:17]
-insect_ps_otu<-otu_table(t(insect_sp), taxa_are_rows = TRUE)
-
-sample_names(insect_ps_otu)<-sample_names(insect_ps)
-
-insect_ps<-merge_phyloseq(insect_ps_otu, insect_ps)
-
-otu_table(insect_ps)[1:3,1:3]
-insect_ps@otu_table
-
-#NMDS of isnect species
-set.seed(101)
-nmds_insect <- phyloseq::ordinate(insect_ps,
-                                       method = "PCoA", # this method has few assumptions and readly accepts different data structures
-                                       distance = "bray", # bray-curtis distance is suitable for sparse data - such as the zero-inflated microbiome data we have
-                                       autotransform = TRUE
-) # automatically transforms your data, if needed. reduces weight of outliers
-# weakties = FALSE prevests tress from colapsing into zero
-
-NMDS_all_samples<-plot_ordination(
-  physeq = physeq_rarefied,
-  ordination = nmds_rootAndSoil,
-  color = "Treatment",
-  shape = "Soil_type"
-) +
-  theme_classic() +
-  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
-  geom_point(aes(size = Time_point), alpha = 1) +
-  theme(legend.position = "right")
-
-#this is the inseq phyloseq object
-insect_ps
-
-#load data
-physeq1 <- import_biom("./Data/featureTable_1.biom")
-physeq2 <- import_biom("./Data/featureTable_2.biom")
-
-#merge both field and potting soil
-physeq<-merge_phyloseq(physeq1, physeq2)
-
-#laod metadata
-metadata <- read.csv2(file = "./Data/metadata.csv", row.names = 3)
-metadata$Time_point<-factor(x = metadata$Time_point, levels = c("Week.4", "Week.8", "Week.12", "Week.16"))
-metadata <-sample_data(metadata)
-
-
-
-#merge metadata with  otu table
-physeq<-merge_phyloseq(physeq, metadata)
 
 #remove rare ASVs
-otu_table(physeq) <- otu_table(physeq)[which(rowSums(otu_table(physeq)) > 7), ] # this drops ~3000 taxa.
+otu_table(physeq) <- otu_table(physeq)[which(rowSums(otu_table(physeq)) > 7), ] 
 
 #check library sizes
 sample_sums(physeq)%>%hist
@@ -87,41 +27,53 @@ sample_sums(physeq)%>%sort(decreasing = FALSE)
 
 #normalize data
 physeq_filtered_df <- as.data.frame(otu_table(physeq))
+rarefaction_curve<-
 rarecurve(t(physeq_filtered_df),
-  #        col = sample_data(physeq)$Soil_type,
           label = FALSE,
-          step = 600,
+          step = 1000,
           main = "Rarefaction ", ylab = "Number of ASVs", xlab = "Number of DNA Sequences",
           abline(v = min(sample_sums(physeq)), lwd = 3, lty = 2))
 
+ggsave(rarefaction_curve, filename = "./Results/Rarefaction_curve.pdf")
+
 
 # now, let's rarefy the data
-set.seed(100) # set a random seed so that whenever you re-run this code you draw the same set of OTUs
-# runt he rarefaction. with 1 argument per line it becomes easier to see what is going on. naming the arguments also help a lot!
+set.seed(100) 
 physeq_rarefied <- rarefy_even_depth(
                                       physeq = physeq,
                                       sample.size = min(sample_sums(physeq)),
                                       rngseed = FALSE,
                                       replace = TRUE,
                                       trimOTUs = TRUE,
-                                      verbose = TRUE
-                                    )
+                                      verbose = TRUE)
+
+#separate phyloseq objects
+
+physeq_rarefied_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Soil_type", "Time_point"))
+physeq_rarefied_soiltype_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Soil_type"))
+
+#save sepaated objects externaly
+save(physeq_rarefied_l, file = "./Data/physeq_rarefied_l.RData")
+save(physeq_rarefied_soiltype_l, file = "./Data/physeq_rarefied_soiltype_l.RData")
 
 
 
-#
 
-# Let's make a Non-Metric Multidimensional Scaling (NMDS) of all our samples based on CSS normalization
-set.seed(101)
+
+
+
+
+########## beta diversity plots ####
+
+# Let's make a Non-Metric Multidimensional Scaling (NMDS) of all our samples 
 nmds_rootAndSoil <- phyloseq::ordinate(physeq_rarefied,
                                        method = "NMDS", # this method has few assumptions and readly accepts different data structures
                                        distance = "bray", # bray-curtis distance is suitable for sparse data - such as the zero-inflated microbiome data we have
                                        trymax=200,
                                        try = 200,
-                                       autotransform = TRUE
-) # automatically transforms your data, if needed. reduces weight of outliers
-# weakties = FALSE prevests tress from colapsing into zero
+                                       autotransform = TRUE) 
 
+# plot the NMDS
 NMDS_all_samples<-plot_ordination(
   physeq = physeq_rarefied,
   ordination = nmds_rootAndSoil,
@@ -138,11 +90,44 @@ ggsave(NMDS_all_samples, filename = "./Results/NMDS_all_samples.pdf",
        height = 180,
        units = "mm")
 
-################# separate phyloseq objects
+#plot an alternative NMDS visualization
+NMDS_all_samples2<-plot_ordination(
+  physeq = physeq_rarefied,
+  ordination = nmds_rootAndSoil,
+  color = "Soil_type",
+  shape = "Treatment"
+) +
+  theme_classic() +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  geom_point(aes(size = Time_point), alpha = 1) +
+  theme(legend.position = "right")
 
-physeq_rarefied_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Soil_type", "Time_point"))
+ggsave(NMDS_all_samples2, filename = "./Results/NMDS_all_samples2.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
 
-# define custom fucntion to plot a list of NMDS results
+#plot an alternative NMDS visualization
+NMDS_all_samples3<-plot_ordination(
+  physeq = physeq_rarefied,
+  ordination = nmds_rootAndSoil,
+  color = "Time_point",
+  shape = "Treatment"
+) +
+  theme_classic() +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  theme(legend.position = "right")+
+  facet_wrap(~Soil_type)+
+  scale_colour_grey()
+
+ggsave(NMDS_all_samples3, filename = "./Results/NMDS_all_samples3.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
+
+
+# define custom function to plot a list of NMDS results
 NMDS_listing <- function(physeq_list) { # first the name of the new function you are saving, then you say you are going to define a function, and then you set it's arguments - here, a single list of phyloseq objects. the {} indicate where the contents of the custom function start and end.
   
   # here we perform the NMDS on all elements of the list using phyloseq::ordinate()
@@ -201,6 +186,14 @@ ggsave(NMDS_plot_grid, filename = "./Results/NMDS_plot_grid.pdf",
 
 
 
+
+
+
+
+
+
+########## beta dispersion ####
+
 #run beta dispersion
 #define funciton
 beta_disp_plotAndTest <- function(phyloseq_list, group) {
@@ -248,20 +241,26 @@ beta_disp_plotAndTest <- function(phyloseq_list, group) {
   )
   
   
-  return(list(bet_disp_PCOa_plot, bet_disp_boxplot))
+  return(bet_disp_PCOa_plot)
 }
 
 # now that we have a custom function, we can run it across all lists and variables
 library(purrr)
 set.seed(5235)
 dip_result3 <- beta_disp_plotAndTest(physeq_rarefied_l, "Treatment")
-dip_result3[[1]]
-
-disppersion_result<-ggarrange(plotlist = dip_result3[[2]],ncol = 4, nrow = 2)  
 
 
 
 
+
+
+
+
+
+
+
+
+########## beta diversity tests ####
 
 
 # let's check now if sample type differ per species. note that this function uses Blocks as strata
@@ -283,7 +282,7 @@ permanova_with_blocks <- function(phyloseq_list, rhs_model) {
 
 permanova_tables<-permanova_with_blocks(phyloseq_list = physeq_rarefied_l,rhs_model = "Treatment")
 
-
+# save and export as flextable
 library("flextable")
 library(tibble)
 permanova_df_l<-lapply(permanova_tables, function(x){
@@ -318,11 +317,23 @@ save_as_docx(flextable_l$Field.Week.4,
              flextable_l$Pot.Week.12,
              flextable_l$Pot.Week.16,
              values = flextable_l,
-             path = "./Results/PERMANOVA_tables_8plots.docx")
+             path = "./Results/PERMANOVA_microbiome_tables_8plots.docx")
 
 
 
-#pairwise permanova
+
+
+
+
+
+
+
+
+
+
+
+
+######### pairwise permanova
 library("EcolUtils")
 set.seed(303848)
 pairwise_permanova <- lapply(physeq_rarefied_l, function (x)
@@ -375,11 +386,78 @@ control_df<-filter(pairwise_permanova_df, treatment_1 =="Control" | treatment_2 
 control_df$combination<-as.factor(control_df$combination)
 
 #line 
+control_comparison_lineplot<-
 ggplot(control_df, aes(x = Time ,y = R2))+
   geom_line(aes(color = combination))+
-  facet_wrap(~Site)
+  facet_wrap(~Site)+
+  theme_bw()
 
-########## alpha diversity
+
+ggsave(control_comparison_lineplot, filename = "./Results/control_comparison_lineplot_pairwise_permanova_microbiome.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##### permanova of mirobiome with treatment*time in pot and field samples in separate
+
+permanova_tables2<-permanova_with_blocks(phyloseq_list = physeq_rarefied_soiltype_l ,rhs_model = "Treatment*Time_point")
+
+
+
+permanova2_df_l<-lapply(permanova_tables2, function(x){
+  
+  #save as dataframe, adjust rownames
+  table_df<-as.data.frame(x)
+  table_df<-rownames_to_column(table_df, var = "Factor")
+  
+  #round values, reduce numebr of digits
+  table_df$SumOfSqs<-round(table_df$SumOfSqs, digits = 3)
+  table_df$R2<-round(table_df$R2, digits = 3)
+  table_df$F<-round(table_df$F, digits = 3)
+  
+  
+  return(table_df)
+  
+  
+})
+
+
+flextable_l2<-lapply(permanova2_df_l, flextable)
+
+
+names(flextable_l2)<-names(permanova2_df_l)
+
+save_as_docx(flextable_l2$Field,
+             flextable_l2$Pot,
+             values = flextable_l2,
+             path = "./Results/PERMANOVA_microbiome_tables_2plots.docx")
+
+
+
+
+
+
+
+
+
+
+
+
+########## alpha diversity plot ####
 
 physeq_rarefied
 library(microbiome)
@@ -408,7 +486,7 @@ ggsave(shannon_topsoil_plot, filename = "./Results/shannon_plot.pdf",
        units = "mm")
 
 
-
+########## alpha diversity test ####
 
 
 # check homogeniety of variances in alpha diversity
@@ -426,99 +504,141 @@ leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity)
   anova_test$`Sum Sq`<-round(anova_test$`Sum Sq`, digits = 3)
   anova_test$`F value`<-round(anova_test$`F value`, digits = 3)
   anova_test$`Pr(>F)`<-round(anova_test$`Pr(>F)`, digits = 3)
-  anova_test<-flextable(anova_test)
+  anova_test_df<-as.data.frame(anova_test)
+  anova_test_df<- rownames_to_column(anova_test_df, var = "Factor")
+  anova_test_ft<-flextable(anova_test_df)
+  
   
   #flextable of pairwside comparsions
-  save_as_docx(shannon_anova_ft,
+  save_as_docx(anova_test_ft,
                path = "./Results/shannon_anova.docx")
   
-  ###########
-  # run miaTime to have a better view of time effects
-  
-  physeq_rarefied_soiltype_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Soil_type"))
-  
-  #convert phyloseq into summarized tree experiment
-  tse_l<-lapply(physeq_rarefied_soiltype_l, function (x) makeTreeSEFromPhyloseq(x))
-  
-  mia::taxonomyRanks(tse_l$Field) 
-  
-  #adjust time formating in the table
-  tse_l<- 
-  lapply(tse_l, function (x){
-    x@colData$Time_point<-   as.numeric(gsub(pattern = "Week.", replacement = "", x = x@colData$Time_point))
-return(x)                                        
-  })
   
   
   
   
-  tse_field <- getStepwiseDivergence(tse_l$Field,
-                                     group = "Treatment",
-                                     time_field = "Time_point",
-                                     time_interval = 4,
-                                     name_divergence = "time_divergence",
-                                     name_timedifference = "time_difference",
-                                     assay.type="counts",
-                                     FUN = vegan::vegdist,
-                                     method="bray") 
   
   
-  field_stepwise_plot<-as.data.frame(tse_field@colData) %>%
-    ggplot(aes(x=Time_point, y=time_divergence))+
-    geom_point(aes(color=Treatment), position = position_jitterdodge(jitter.width = 0.1,
-                                                                     dodge.width = 0.7))+
-    geom_smooth()+
-    theme_bw()+
-    ylim(0.3, 0.9)+
-    labs(x="Time (weeks) in field", y="Stepwise time divergence") +
-    facet_wrap(~Treatment)
+  #### matrix of heat trees ####
+  
+  library(metacoder)
+  phyloseq_to_heat_tree_matrix2<-function(ps_object, sample_group){
+    
+    
+    
+    
+    # this function output is a heat trees comparing metadata. the input is based on a phyloseq object
+    
+    # ps object =  a phyloseq object, containing sample metadata, otu table, and taxonomy table
+    # sample_group = the name of a column in your emtadata that you want to compare in the heat tree. it has to be quoted.
+    
+    # this function will create a matrix of heat trees if your metadata has more than 2 groups. it should fail if it has only 1 group
+    
+    # turn NA into "" so it is not completety missing ofmr the tree  
+    ps_object@tax_table@.Data[is.na(ps_object@tax_table)]<-""
+    
+    #remove unecessary taxonomic info (dada2id, "s__" and "ASV_id) by updating the tax table with a subset of the tax table
+    tax_table(ps_object)<-tax_table(ps_object)[,1:6]
+    
+    
+    # let's remove the "r__"ranks from the taxonomy, they can be useful but will pollute our plot
+    tax_table(ps_object)[, colnames(tax_table(ps_object))] <- gsub(pattern = "[a-z]__", # regular expression pattern to search for
+                                                                   x = tax_table(ps_object)[, colnames(tax_table(ps_object))], # "df"
+                                                                   replacement = "") # replacement for pattern
+    # transform from phyloseq to taxmap object
+    taxmap_obj<-parse_phyloseq(ps_object)
+    
+    #get abundance per taxon
+    taxmap_obj$data$tax_abund<-calc_taxon_abund(obj = taxmap_obj, 
+                                                data = "otu_table",
+                                                cols = taxmap_obj$data$sample_data$sample_id) 
+    
+    #get occurrence of ASVs per treatment
+    # the sample groups needs some wrangling to fit within the soft code of the function
+    taxmap_obj$data$tax_occ<- calc_n_samples(obj = taxmap_obj, 
+                                             data = "tax_abund", 
+                                             cols = taxmap_obj$data$sample_data$sample_id,
+                                             groups = taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]]) 
+    
+    # calculate log2 median ratios and p values for a wilcoxcon test within taxas in this stress treatment groups
+    # the sample groups needs some wrangling to fit within the soft code of the function
+    taxmap_obj$data$diff_table <- compare_groups(obj = taxmap_obj,
+                                                 data = "tax_abund",
+                                                 cols = taxmap_obj$data$sample_data$sample_id, 
+                                                 groups = taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]]) 
+    
+    # set differential log ratio to 0 based on adjusted p values
+     taxmap_obj$data$diff_table$log2_median_ratio[taxmap_obj$data$diff_table$wilcox_p_value > 0.05] <- 0
+    
+    # define number of compared factors
+    factors_compared<-taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]] 
+    
+    # draw the plot based on an if else statement: if there are 2 groups, plot a a heat tree comparing abundances between both groups, else plot a matrix of ehat trees. this function will fail if you only have 1 sample group! 
+    
+    if (length(unique(factors_compared)) == 2) {
+      
+      set.seed(1)
+      output<- taxmap_obj %>%
+        heat_tree(
+          node_label = taxon_names,
+                data = "diff_table", 
+          node_size = n_obs,
+          node_color = mean_diff,
+          node_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+          node_color_range = c("cyan", "gray", "tan"), # The color palette used
+          layout = "davidson-harel",
+          initial_layout = "reingold-tilford")
+      
+    } else {
+      
+      set.seed(1)
+      output<-heat_tree_matrix(taxmap_obj,
+                               data = "diff_table", # this is the table with the data you want to plot
+                               node_size = n_obs, # n_obs is a function that calculates, in this case, the number of OTUs per taxon
+                               node_label = taxon_names,
+                               node_color = log2_median_ratio, # A column from `taxmap_obj$data$diff_table_3treatments`
+                               node_color_range = diverging_palette(), # The built-in palette for diverging data
+                               node_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+                               edge_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+                               node_size_axis_label = "Number of OTUs",
+                               node_color_axis_label = "Log2 ratio median proportions",
+                               layout = "davidson-harel", # The primary layout algorithm
+                               initial_layout = "reingold-tilford") # The layout algorithm that initializes node locations
+      
+      
+      
+    }
+    
+    
+    # clearly define the output object you will get from the function
+    return(output)   
+    
+    
+  }
+  
+  physeq_rarefied_filt_l<-lapply(physeq_rarefied_l, function(x) subset_taxa(physeq = x, Kingdom == "k__Bacteria"))
+
+
+  # apply filter function on list of phyloseq objects - account for at least 0.5% of the reads in a sample & be present in at least 25% of the samples
+  physeq_rarefied_filt_l<-lapply(physeq_rarefied_filt_l, function(x) filterPhyseq(x, 0.005, 25))
+  
+  
+  heat_tree_microbe_l<-lapply(physeq_rarefied_filt_l[1:4], function(x)
+    phyloseq_to_heat_tree_matrix2(ps_object = x, 
+                                 sample_group = "Treatment"))
   
 
-  
-  
-  
-  
-  
-  
- #pot 
-  tse_pot <- getStepwiseDivergence(tse_l$Pot,
-                                     group = "Treatment",
-                                     time_field = "Time_point",
-                                     time_interval = 4,
-                                     name_divergence = "time_divergence",
-                                     name_timedifference = "time_difference",
-                                     assay.type="counts",
-                                     FUN = vegan::vegdist,
-                                     method="bray") 
-  
-  
-  pot_stepwise_plot<-as.data.frame(tse_pot@colData) %>%
-    ggplot(aes(x=Time_point, y=time_divergence))+
-    geom_point(aes(color=Treatment), position = position_jitterdodge(jitter.width = 0.1,
-                                                                     dodge.width = 0.7))+
-    geom_smooth()+
-    theme_bw()+
-    labs(x="Time (weeks) in pots", y="Stepwise time divergence") +
-    ylim(0.3, 0.9)+
-    facet_wrap(~Treatment)
-  
-  #put both plots in one pannel adn export
-  stepwise_time_plot<-
-  ggarrange(field_stepwise_plot, pot_stepwise_plot, labels = "AUTO", common.legend = TRUE)
+  heat_tree_array<-ggarrange(plotlist = heat_tree_microbe_l, labels = c("Week 4", "week 8", "week 12", "week 16"))
 
- ggsave(stepwise_time_plot, file = "./stepwise_time_plot.pdf", width = 180, height = 120, units = "mm")
-
- 
- # check specific microbes of interest
- tse_pot$ASV1
- 
- library(miaViz)
- plotSeries(tse_pot,
-            x = "Time_point",
-            y = c("ASV1", "ASV2"),
-            assay.type = "counts")+
-   theme_bw()
- 
- 
- 
+  #save shannon plot
+  ggsave(plot = heat_tree_array, 
+         filename = "./Results/microbiome_heat_tree_array_field.pdf",
+         width = 600,
+         height = 600,
+         units = "mm")
+  
+  
+  
+  
+  
   

@@ -1,0 +1,213 @@
+---
+title: "3_time_serias_mia_package"
+author: "Pedro Beschoren da Costa"
+date: "2023-08-14"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+```{r}
+
+library(phyloseq)
+library(vegan)
+library(dplyr)
+library(ggplot2)
+library(metagMisc)
+library(ggpubr)
+library(plyr)
+library(miaTime)
+library(knitr)
+library(mia)
+
+```
+
+
+
+# laod microbiome data
+```{r}
+###########
+  # run miaTime to have a better view of time effects
+  
+  load( file = "./Data/physeq_rarefied_soiltype_l.RData")
+
+physeq_rarefied_soiltype_l
+  
+  #convert phyloseq into summarized tree experiment
+  tse_l<-lapply(physeq_rarefied_soiltype_l, function (x) makeTreeSEFromPhyloseq(x))
+  
+ #adjust time formating in the table
+  tse_l<- 
+  lapply(tse_l, function (x){
+    x@colData$Time_point<-   as.numeric(gsub(pattern = "Week.", replacement = "", x = x@colData$Time_point))
+return(x)                                        
+  })
+  
+```
+  
+  
+# run field time series beta div calculations and plot
+```{r}
+  tse_field <- getStepwiseDivergence(tse_l$Field,
+                                     group = "Treatment",
+                                     time_field = "Time_point",
+                                     time_interval = 4,
+                                     name_divergence = "time_divergence",
+                                     name_timedifference = "time_difference",
+                                     assay.type="counts",
+                                     FUN = vegan::vegdist,
+                                     method="bray") 
+  
+  
+  field_stepwise_plot<-as.data.frame(tse_field@colData) %>%
+    ggplot(aes(x=Time_point, y=time_divergence))+
+    geom_point(aes(color=Treatment), position = position_jitterdodge(jitter.width = 0.1,
+                                                                     dodge.width = 0.7))+
+    geom_smooth()+
+    theme_bw()+
+    ylim(0.3, 0.9)+
+    labs(x="Time (weeks) in field", y="Stepwise time divergence") +
+    facet_wrap(~Treatment)
+  
+
+  
+  
+  
+```
+
+
+# run pot time series beta div calculations and plot
+```{r} 
+  
+ #pot 
+  tse_pot <- getStepwiseDivergence(tse_l$Pot,
+                                     group = "Treatment",
+                                     time_field = "Time_point",
+                                     time_interval = 4,
+                                     name_divergence = "time_divergence",
+                                     name_timedifference = "time_difference",
+                                     assay.type="counts",
+                                     FUN = vegan::vegdist,
+                                     method="bray") 
+  
+  
+  pot_stepwise_plot<-as.data.frame(tse_pot@colData) %>%
+    ggplot(aes(x=Time_point, y=time_divergence))+
+    geom_point(aes(color=Treatment), position = position_jitterdodge(jitter.width = 0.1,
+                                                                     dodge.width = 0.7))+
+    geom_smooth()+
+    theme_bw()+
+    labs(x="Time (weeks) in pots", y="Stepwise time divergence") +
+    ylim(0.3, 0.9)+
+    facet_wrap(~Treatment)
+  
+  #put both plots in one pannel adn export
+  stepwise_time_plot<-
+  ggarrange(field_stepwise_plot, pot_stepwise_plot, labels = "AUTO", common.legend = TRUE)
+
+ ggsave(stepwise_time_plot, file = "./stepwise_time_plot.pdf", width = 180, height = 120, units = "mm")
+
+ 
+ # check specific microbes of interest
+ tse_pot$ASV1
+ 
+ library(miaViz)
+ plotSeries(tse_pot,
+            x = "Time_point",
+            y = c("ASV1", "ASV2"),
+            assay.type = "counts")+
+   theme_bw()
+ 
+ 
+  
+```
+
+## same as above, but for insect community
+
+
+
+# laod insect data
+```{r}
+#load
+load( file = "./Data/insect_ps.RData")
+
+insect_ps@sam_data$Time_point<-gsub(pattern = ".*\\.", replacement = "", x = sample_names(insect_ps))
+
+insect_ps_l<-list("Pot" = subset_samples(insect_ps, Soil =="Pot"),
+                  "Field" = subset_samples(insect_ps, Soil =="Field"))
+  
+  #convert phyloseq into summarized tree experiment
+tse_l<-lapply(insect_ps_l, function (x) makeTreeSEFromPhyloseq(x))
+
+
+
+
+```
+  
+  
+# run field time series beta div calculations and plot
+```{r}
+  tse_field <- getStepwiseDivergence(tse_l$Field,
+                                     group = "Treatment",
+                                     time_field = "Observation",
+                                     time_interval = 4,
+                                     name_divergence = "time_divergence",
+                                     name_timedifference = "time_difference",
+                                     assay.type="counts",
+                                     FUN = vegan::vegdist,
+                                     method="bray") 
+  
+  
+  field_stepwise_plot<-as.data.frame(tse_field@colData) %>%
+    ggplot(aes(x=Observation, y=time_divergence))+
+    geom_point(aes(color=Treatment), position = position_jitterdodge(jitter.width = 0.1,
+                                                                     dodge.width = 0.7))+
+    geom_smooth()+
+    theme_bw()+
+    ylim(0.3, 0.9)+
+    labs(x="Time (weeks) in field", y="Stepwise time divergence") +
+    facet_wrap(~Treatment)
+  
+
+  
+  
+  
+```
+
+
+# run pot time series beta div calculations and plot
+```{r} 
+  
+ #pot 
+  tse_pot <- getStepwiseDivergence(tse_l$Pot,
+                                     group = "Treatment",
+                                     time_field = "Observation",
+                                     time_interval = 4,
+                                     name_divergence = "time_divergence",
+                                     name_timedifference = "time_difference",
+                                     assay.type="counts",
+                                     FUN = vegan::vegdist,
+                                     method="bray") 
+  
+  
+  pot_stepwise_plot<-as.data.frame(tse_pot@colData) %>%
+    ggplot(aes(x=Observation, y=time_divergence))+
+    geom_point(aes(color=Treatment), position = position_jitterdodge(jitter.width = 0.1,
+                                                                     dodge.width = 0.7))+
+    geom_smooth()+
+    theme_bw()+
+    labs(x="Time (weeks) in pots", y="Stepwise time divergence") +
+    ylim(0.3, 0.9)+
+    facet_wrap(~Treatment)
+  
+  #put both plots in one pannel adn export
+  stepwise_time_plot<-
+  ggarrange(field_stepwise_plot, pot_stepwise_plot, labels = "AUTO", common.legend = TRUE)
+
+ ggsave(stepwise_time_plot, file = "./Results/stepwise_time_plot_insect.pdf", width = 180, height = 120, units = "mm")
+
+
+  
+```

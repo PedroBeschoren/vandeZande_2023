@@ -1,0 +1,523 @@
+---
+title: "2_insect_diversity"
+author: "Pedro Beschoren da Costa"
+date: "2023-08-10"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# load libraries
+```{r}
+library(phyloseq)
+library(vegan)
+library(dplyr)
+library(ggplot2)
+library(metagMisc)
+library(ggpubr)
+library(plyr)
+library(miaTime)
+library(knitr)
+library(mia)
+library(tidyr)
+library(tibble)
+library(viridis)
+
+```
+
+
+# load insect data
+```{r}
+
+# feature tables
+Insect_features<-read.csv("./Data/insect_few_columns.csv", sep = ",", row.names = 2)[,-1]
+
+# metadata
+Insect_metadata<-read.csv2("./Data/Metadata_field_herbivore_observations_2021.csv", row.names = 1 )
+#Insect_metadata$Observation<-as.factor(Insect_metadata$Observation)
+
+# taxonomy
+Insect_taxonomy<-read.csv2("./Data/Taxonomy_table_field_herbivores.csv", row.names = 1)
+
+
+#transform intoa phyloseq object
+Insect_features<-otu_table(t(Insect_features), taxa_are_rows = TRUE)
+Insect_metadata<-sample_data(Insect_metadata)
+Insect_taxonomy<-tax_table(as.matrix(Insect_taxonomy))
+
+insect_ps<-merge_phyloseq(Insect_features, Insect_metadata, Insect_taxonomy)
+
+#remove insects occuring less tha 8 times (they amke some calculations more dificult, and will hardly provide a key insight)
+otu_table(insect_ps) <- otu_table(insect_ps)[which(rowSums(otu_table(insect_ps)) > 7), ] 
+
+#save externally
+save(insect_ps, file = "./Data/insect_ps.RData")
+
+
+
+
+```
+
+
+```{r}
+
+
+
+
+# Let's make a Non-Metric Multidimensional Scaling (PCoA_insect_) of all our samples 
+PCoA_insect <- phyloseq::ordinate(insect_ps,
+                                       method = "PCoA", 
+                                       distance = "bray", 
+                                       autotransform = TRUE) 
+
+# plot the PCoA_insect_
+PCoA_insect_all_samples<-plot_ordination(
+  physeq = insect_ps,
+  axes = c(1,2),
+  ordination = PCoA_insect,
+  color = "Observation",
+) +
+  theme_classic() +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  theme(legend.position = "right")+
+  scale_colour_viridis()
+  PCoA_insect_all_samples
+
+ggsave(PCoA_insect_all_samples, filename = "./Results/PCoA_1_2_insect_all_samples.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
+
+
+PCoA_insect_all_samples<-plot_ordination(
+  physeq = insect_ps,
+  axes = c(1,3),
+  ordination = PCoA_insect,
+  color = "Observation",
+) +
+  theme_classic() +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  theme(legend.position = "right")+
+  scale_colour_viridis()
+  PCoA_insect_all_samples
+
+ggsave(PCoA_insect_all_samples, filename = "./Results/PCoA_1_3_insect_all_samples.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
+
+
+
+PCoA_insect_all_samples<-plot_ordination(
+  physeq = insect_ps,
+  axes = c(2,3),
+  ordination = PCoA_insect,
+  color = "Observation",
+) +
+  theme_classic() +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  theme(legend.position = "right")+
+  scale_colour_viridis()
+  PCoA_insect_all_samples
+
+ggsave(PCoA_insect_all_samples, filename = "./Results/PCoA_2_3_insect_all_samples.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
+
+
+
+```
+
+# split into several datasets instead of a single PCoA calculation
+```{r}
+
+
+# split ps object
+insect_ps_l<-phyloseq_sep_variable(insect_ps, variable = c("Soil", "Treatment"))
+insect_ps_soil_l<-phyloseq_sep_variable(insect_ps, variable = c("Soil"))
+
+
+ #define custom fucntion to plot a list of NMDS results
+PCoA_listing <- function(physeq_list) { # first the name of the new function you are saving, then you say you are going to define a function, and then you set it's arguments - here, a single list of phyloseq objects. the {} indicate where the contents of the custom function start and end.
+  
+  # here we perform the NMDS on all elements of the list using phyloseq::ordinate()
+  PCoA_list <- lapply(physeq_list, function(x) {
+    ordinate(
+      physeq = x, # your phyloseq object, each element x in the list
+      method = "PCoA", # ordination method to use
+      distance = "bray", # distance metric to use
+      autotransform = TRUE
+    )
+  }) # automatic data transformation
+  
+  # mapply will perform one function on two lists. define the lists in the end of the function
+  untitled_plot_list <- mapply(function(x, y) { # mapply will run one function on 2 lists
+    plot_ordination(
+      physeq = x, # your phyloseq object, each element x in the list
+      ordination = y, # your phyloseq-generated ordination object, each element y in the list made above
+      color = "Observation"
+    ) + # dot colors in the plot
+      theme_classic() + # ggplot option to remove background
+      theme(plot.title = element_text(size = 10, face = "bold")) + # options for the title
+      theme(legend.position = "right")+
+  scale_colour_viridis()
+  }, # position for the legend
+  x = physeq_list, # note that you only define x here, after you define your plot function
+  y = PCoA_list, # note that you only definee y here, after you define your plot function
+  SIMPLIFY = FALSE
+  ) # if you simply, all resusts are saved in a vector
+  
+  # The plots above miss a title, so you don't really know who is root and who is soil. this code create a list of names to be used as titles in your plot
+  tiles_list <- names(untitled_plot_list)
+  
+  Plot_list <- mapply(function(z, w) { # use mapply again to put those listed names in the list of plots
+    z + ggtitle(w)
+  },
+  z = untitled_plot_list,
+  w = tiles_list,
+  SIMPLIFY = FALSE
+  )
+  
+  return(list(PCoA_list, Plot_list)) # with this you specify the output of your custom function. Note we are saving both the NMDS calculations and the plot as a list, so we don't ahve to re-calculate the NMDS later
+}
+
+
+# run NMDS and put it in a single plot
+PCoA_plot_l<-PCoA_listing(physeq_list = insect_ps_l)
+
+NMDS_plot_grid<-ggarrange(plotlist = NMDS_plot[[2]],ncol = 4, nrow = 2, common.legend = TRUE)  
+
+ggsave(NMDS_plot_grid, filename = "./Results/NMDS_plot_grid.pdf",
+       width = 400,
+       height = 230,
+       units = "mm")
+```
+
+
+
+# permanovas
+```{r}
+
+
+
+
+# let's check now if sample type differ per species. note that this function uses Blocks as strata
+permanova_with_blocks <- function(phyloseq_list, rhs_model) {
+  # phyloseq_list = list of phyloseq objects
+  # RHS_model = right hand side model, such as MeJA_treatment*Sample_type + Block
+  lapply(phyloseq_list, function(x) {
+    set.seed(1234)
+    lhs_data <- phyloseq::distance(t(otu_table(x)), method = "bray")
+    rhs_model_in <- paste(rhs_model)
+    form <- as.formula(paste("lhs_data~", paste(rhs_model_in))) # getting the formulat properly evaluated as custom string is tricky
+    output <- adonis2(form,
+                      data = as(sample_data(x), "data.frame"), # changing with as.data.frame is insufficient
+                      permutations = how(within = Within(type = "free"), nperm = 9999)
+    ) # how defines the permutations, it is important to adjust it to the experimental design such as a time series
+    return(output)
+  })
+}
+
+permanova_tables<-permanova_with_blocks(phyloseq_list = insect_ps_soil_l, rhs_model = "Treatment*Observation")
+
+
+library("flextable")
+library(tibble)
+permanova_df_l<-lapply(permanova_tables, function(x){
+  
+  #save as dataframe, adjust rownames
+  table_df<-as.data.frame(x)
+  table_df<-rownames_to_column(table_df, var = "Factor")
+  
+  #round values, reduce numebr of digits
+  table_df$SumOfSqs<-round(table_df$SumOfSqs, digits = 3)
+  table_df$R2<-round(table_df$R2, digits = 3)
+  table_df$F<-round(table_df$F, digits = 3)
+
+  
+  return(table_df)
+  
+  
+})
+
+
+flextable_l<-lapply(permanova_df_l, flextable)
+
+
+names(flextable_l)<-names(permanova_df_l)
+
+
+save_as_docx(flextable_l$Field,
+             flextable_l$Pot,
+             values = flextable_l,
+             path = "./Results/PERMANOVA_tables_insect_field_pot_treatmentXobservation.docx")
+
+
+
+permanova_df_l<-lapply(permanova_tables, function(x){
+  
+  #save as dataframe, adjust rownames
+  table_df<-as.data.frame(x)
+  table_df<-rownames_to_column(table_df, var = "Factor")
+  
+  #round values, reduce numebr of digits
+  table_df$SumOfSqs<-round(table_df$SumOfSqs, digits = 3)
+  table_df$R2<-round(table_df$R2, digits = 3)
+  table_df$F<-round(table_df$F, digits = 3)
+
+  
+  return(table_df)
+  
+  
+})
+
+
+
+
+
+```
+
+# calcualte alpha diversity
+
+```{r}
+# calculate diversity in topsoils
+
+  taxon_diversity<-microbiome::diversity(insect_ps,index = "Shannon")
+  merg_to_ps<-sample_data(taxon_diversity) 
+  taxon_diversity<-as(sample_data(merge_phyloseq(insect_ps,merg_to_ps)),"data.frame") 
+
+
+# plot diversity from topsoils
+shannon_loess_plot<-
+  ggplot(taxon_diversity, aes(x =Observation, y = shannon, colour =Treatment))+
+ geom_point() +
+  geom_smooth(se = TRUE, method = loess, fullrange = FALSE, span = 0.75, fill = "Grey")+  
+     theme_bw()+
+  facet_wrap(~ Soil )
+
+
+taxon_diversity$Observation<-as.factor(taxon_diversity$Observation)
+
+#save shannon plot
+ggsave(shannon_loess_plot, filename = "./Results/insect_shannon_loess_plot.pdf",
+       width = 210,
+       height = 120,
+       units = "mm")
+
+
+shannon_box_plot<-
+  ggplot(taxon_diversity, aes(x =Observation , y = shannon, fill=Treatment))+
+    geom_boxplot(alpha = 0.4, outlier.shape = NA, position = "dodge")+
+    theme_bw()+
+    labs(title = "Shannon diversity")+
+    ylab("Shannon diversity index")+
+    xlab("Time points")+
+    facet_wrap(~Soil)
+
+
+#save shannon plot
+ggsave(shannon_box_plot, filename = "./Results/insect_shannon_box_plot.pdf",
+       width = 400,
+       height = 230,
+       units = "mm")
+  
+
+
+
+```
+
+```{r}
+
+
+# check homogeniety of variances in alpha diversity
+library(car)
+leveneTest((shannon) ~ Treatment*Soil*as.factor(Observation), data = taxon_diversity) 
+
+#two-way anova, shanon diversity index
+  tx <- with(taxon_diversity, interaction(Treatment,Soil,as.factor(Observation))) #needed for tukey to test interaction
+  aovTukey<-aov(shannon ~ tx, data = taxon_diversity)#needed for tukey to test interaction
+  anova_test<-Anova(lm((shannon) ~Treatment*Soil*as.factor(Observation), data = taxon_diversity, contrasts=list(Treatment=contr.sum, Soil=contr.sum, Observation = contr.sum)), type = "2") 
+  tukey_result<-TukeyHSD(aovTukey, "tx", group=TRUE, console=TRUE)#post-hoc
+  
+
+  
+  anova_test$`Sum Sq`<-round(anova_test$`Sum Sq`, digits = 3)
+  anova_test$`F value`<-round(anova_test$`F value`, digits = 3)
+  anova_test$`Pr(>F)`<-round(anova_test$`Pr(>F)`, digits = 3)
+  anova_test_df<-as.data.frame(anova_test)
+  anova_test_df<- rownames_to_column(anova_test_df, var = "Factor")
+  anova_test_ft<-flextable(anova_test_df)
+  
+  
+  #flextable of pairwside comparsions
+  save_as_docx(anova_test_ft,
+               path = "./Results/shannon_anova_insect.docx")
+  
+  
+```
+
+
+```{r}
+
+#load libraries
+library(metacoder) # base package we will work with
+library(phyloseq) # essential data container
+library(metagMisc) # turns ps objects into lists of ps objects
+library(purrr) # has map() to extract values from lists
+library(dplyr)
+library(tibble)
+library(tidyverse)
+```
+
+```{r}
+phyloseq_to_heat_tree_matrix<-function(ps_object, sample_group){
+  
+  
+  
+  
+  # this function output is a heat trees comparing metadata. the input is based on a phyloseq object
+  
+  # ps object =  a phyloseq object, containing sample metadata, otu table, and taxonomy table
+  # sample_group = the name of a column in your emtadata that you want to compare in the heat tree. it has to be quoted.
+  
+  # this function will create a matrix of heat trees if your metadata has more than 2 groups. it should fail if it has only 1 group
+  
+# turn NA into "" so it is not completety missing ofmr the tree  
+ps_object@tax_table@.Data[is.na(ps_object@tax_table)]<-""
+
+#remove unecessary taxonomic info (dada2id, "s__" and "ASV_id) by updating the tax table with a subset of the tax table
+tax_table(ps_object)<-tax_table(ps_object)[,1:6]
+
+
+# let's remove the "r__"ranks from the taxonomy, they can be useful but will pollute our plot
+tax_table(ps_object)[, colnames(tax_table(ps_object))] <- gsub(pattern = "[a-z]__", # regular expression pattern to search for
+                                                                   x = tax_table(ps_object)[, colnames(tax_table(ps_object))], # "df"
+                                                                   replacement = "") # replacement for pattern
+# transform from phyloseq to taxmap object
+taxmap_obj<-parse_phyloseq(ps_object)
+
+#get abundance per taxon
+taxmap_obj$data$tax_abund<-calc_taxon_abund(obj = taxmap_obj, 
+                                      data = "otu_table",
+                                      cols = taxmap_obj$data$sample_data$sample_id) 
+
+#get occurrence of ASVs per treatment
+# the sample groups needs some wrangling to fit within the soft code of the function
+taxmap_obj$data$tax_occ<- calc_n_samples(obj = taxmap_obj, 
+                                                      data = "tax_abund", 
+                                                      cols = taxmap_obj$data$sample_data$sample_id,
+                                                      groups = taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]]) 
+
+# calculate log2 median ratios and p values for a wilcoxcon test within taxas in this stress treatment groups
+# the sample groups needs some wrangling to fit within the soft code of the function
+taxmap_obj$data$diff_table <- compare_groups(obj = taxmap_obj,
+                                                        data = "tax_abund",
+                                                        cols = taxmap_obj$data$sample_data$sample_id, 
+                                                        groups = taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]]) 
+
+# set differential log ratio to 0 based on adjusted p values
+# taxmap_obj$data$diff_table$log2_median_ratio[taxmap_obj$data$diff_table$wilcox_p_value > 0.05] <- 0
+
+# define number of compared factors
+factors_compared<-taxmap_obj$data$sample_data[colnames(taxmap_obj$data$sample_data)==sample_group][[1]] 
+
+# draw the plot based on an if else statement: if there are 2 groups, plot a a heat tree comparing abundances between both groups, else plot a matrix of ehat trees. this function will fail if you only have 1 sample group! 
+
+if (length(unique(factors_compared)) == 2) {
+
+set.seed(1)
+ output<- taxmap_obj %>%
+heat_tree(
+            node_label = taxon_names,
+      #      data = "diff_table", 
+            node_size = n_obs,
+            node_color = mean_diff,
+            node_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+            node_color_range = c("cyan", "gray", "tan"), # The color palette used
+            layout = "davidson-harel",
+            initial_layout = "reingold-tilford")
+
+ } else {
+
+set.seed(1)
+output<-heat_tree_matrix(taxmap_obj,
+                         data = "diff_table", # this is the table with the data you want to plot
+                         node_size = n_obs, # n_obs is a function that calculates, in this case, the number of OTUs per taxon
+                         node_label = taxon_names,
+                         node_color = mean_diff, # A column from `taxmap_obj$data$diff_table_3treatments`
+                         node_color_range = diverging_palette(), # The built-in palette for diverging data
+                         node_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+                         edge_color_interval = c(-3, 3), # The range of `log2_median_ratio` to display
+                         node_size_axis_label = "Number of OTUs",
+                         node_color_axis_label = "Log2 ratio median proportions",
+                         layout = "davidson-harel", # The primary layout algorithm
+                         initial_layout = "reingold-tilford") # The layout algorithm that initializes node locations
+
+   
+   
+ }
+
+
+# clearly define the output object you will get from the function
+return(output)   
+
+
+}
+
+
+
+
+# turn NA classifications into "", previewing their complete removal from the tree; add microbiome type as metadata
+insect_ps@tax_table@.Data[is.na(insect_ps@tax_table)]<-""
+  
+
+subset_taxa(insect_ps, Family =="Pieridae")
+
+insect_ps@tax_table@.Data[,4]
+
+
+
+
+heat_tree_insect<-
+phyloseq_to_heat_tree_matrix(ps_object = insect_ps, 
+                             sample_group = "Treatment")
+
+
+
+#save shannon plot
+ggsave(heat_tree_insect, filename = "./Results/insect_heat_tree.pdf",
+       width = 230,
+       height = 230,
+       units = "mm")
+
+
+
+
+heat_tree_insect_l<-lapply(insect_ps_soil_l, function(x)
+  phyloseq_to_heat_tree_matrix(ps_object = x, 
+                             sample_group = "Treatment"))
+
+
+#save shannon plot
+ggsave(heat_tree_insect_l$Field, filename = "./Results/insect_heat_tree_field.pdf",
+       width = 230,
+       height = 230,
+       units = "mm")
+
+
+#save shannon plot
+ggsave(heat_tree_insect_l$Pot, filename = "./Results/insect_heat_tree_pot.pdf",
+       width = 230,
+       height = 230,
+       units = "mm")
+
+
+
+
+
+```
+

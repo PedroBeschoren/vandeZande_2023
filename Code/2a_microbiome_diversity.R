@@ -420,12 +420,6 @@ ggarrange(
     theme_bw(), ncol = 1)
 
 
-
-
-
-
-
-
 ggsave(focal_line_plot, filename = "./Results/comparison_lineplot_pairwise_permanova_microbiome.pdf",
        width = 120,
        height = 300,

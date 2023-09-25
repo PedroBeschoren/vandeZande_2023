@@ -349,8 +349,18 @@ write.csv(list_network_metrics, "./Results/network_metrics.csv")
 library(ggrepel)
 keystone_list <- map(node_metrics, KeystoneDetector3)
 
-view(node_metrics$bac_insct_field_ps)
+#rename node metric df
 complete_node_metrics<-node_metrics
+
+#export keystone detector plot
+network_Degree_Closeness_Betweeness<-
+ggarrange(keystone_list$bac_insct_field_ps[[1]],
+          keystone_list$bac_insct_pot_ps[[1]], ncol = 1, nrow = 2)
+
+ggsave(network_Degree_Closeness_Betweeness,filename = "./Results/network_Degree_Closeness_Betweeness.pdf", 
+       width = 110, 
+       height = 110, 
+       units = "mm")
 
 ```
 
@@ -400,6 +410,8 @@ x = complete_node_metrics,
 y = freq_per_treat,
 SIMPLIFY = FALSE
 )
+
+
 
 
 

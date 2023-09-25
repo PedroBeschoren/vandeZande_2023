@@ -692,10 +692,8 @@ adjustInput_run_eigen_correlation_adjustOutput<-function(igraph_obj, phyloseq_ob
   
   #turn sample data into dataframe, with numeric variable...
   test_ps_meta<-as(sample_data(phyloseq_obj),"data.frame")
-  test_ps_meta$leaf_dry_weight<-as.numeric(test_ps_meta$leaf_dry_weight)
-  test_ps_meta$MYC2_at_fold_DD<-as.numeric(test_ps_meta$MYC2_at_fold_DD)
-  test_ps_meta$lox2_at_fold_DD <-as.numeric(test_ps_meta$lox2_at_fold_DD )
-  
+  test_ps_meta$Biomass<-as.numeric(test_ps_meta$Biomass)
+
   #remove weights to calculate modularity
   E(igraph_obj)$weight<-1
   
@@ -706,7 +704,7 @@ adjustInput_run_eigen_correlation_adjustOutput<-function(igraph_obj, phyloseq_ob
   biom_eigen<-eigen_correlation( data = as.data.frame(t(otu_table(phyloseq_obj))),
                                  community = community_data,
                                  metadata = test_ps_meta,
-                                 categories= c("leaf_dry_weight", "MYC2_at_fold_DD", "lox2_at_fold_DD"))
+                                 categories= c("Biomass"))
   
   # this gives Freq as an integer of number of nodes in module and community.sizes as a factor with the name of the module. merge it with the main object
   module_sizes<-as.data.frame(sizes(community_data))%>%

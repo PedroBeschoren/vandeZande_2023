@@ -119,15 +119,15 @@ ps_list_network<-list("bac_insct_field_ps" = bac_insct_field_ps,
 
 ```{r}
 # define pulsar parameters. when testing different parameters, reduce the rep.num to 50 to speed up calculations
-pargs <- list(rep.num = 75, seed = 10010, ncores = 1, thresh = 0.05)
+pargs <- list(rep.num = 75, seed = 10010, ncores = 1, thresh = 0.01)
 
 t0<-Sys.time()
 # run the main function to calculate the network. it can take several minutes to a couple hours
 list_spiec_objct <- lapply(ps_list_network, function(x) {
   SpiecEasi::spiec.easi(x,
     method = "glasso", # if you change methods to "mb" you will have to change detials in make_igrap() as commented in that function
-    lambda.min.ratio = 1e-3, # the higher the more edges, leading to higher density network. as it goes lower, computational times increases SUBSTANTIALLY. standard is 1e-3 but 1e-2 works well ; pedro's PC crahs when 1e-7
-    nlambda = 20, # number of slices between minimum amount of edges to maximum. low lavues dive more sparse networks, high values give denser networks. keep it between 10 and 100
+    lambda.min.ratio = 1e-2, # the higher the more edges, leading to higher density network. as it goes lower, computational times increases SUBSTANTIALLY. standard is 1e-3 but 1e-2 works well ; pedro's PC crahs when 1e-7
+    nlambda = 70, # number of slices between minimum amount of edges to maximum. low lavues dive more sparse networks, high values give denser networks. keep it between 10 and 100
     sel.criterion = "bstars", # selects the lambda and modules the most stable connections
     pulsar.select = TRUE,
     pulsar.params = pargs
@@ -136,8 +136,8 @@ list_spiec_objct <- lapply(ps_list_network, function(x) {
 t1<-Sys.time()
 t0-t1 # ~ 10 min 
 
-save(list_spiec_objct, file = "./Results/list_spiec_objct.RData")
-
+save(list_spiec_objct, file = "./Results/list_spiec_objct_tresh001.RData")
+load(file = "./Results/list_spiec_objct_tresh001.RData")
 
 ```
 
@@ -199,6 +199,40 @@ Degree_histogram_with_name(listed_igraph)
 Weight_histogram_with_name(listed_igraph)
 # *************************** Done!
 ```
+
+
+
+#keep only the top 25% and bottom 25% of edges weights
+our network is too dense. let's remove some edges in the middle of the weight dsitribution
+```{r}
+
+#define funciton to filter igraph object based on edge weight
+fiter_on_weight<-function(igrap_obj){
+
+  #define quartiles of weights
+summary_weight<-E(igrap_obj)$weight%>%summary
+
+# remove weghts wihin second and thrd quartile, keeping only the 50% extremes
+filtered_igraph_obj<-
+  igrap_obj - E(igrap_obj)[E(igrap_obj)$weight >= summary_weight[2] & E(igrap_obj)$weight <= summary_weight[5]]
+
+
+#return filtered igraph object
+return(filtered_igraph_obj)
+
+}
+
+# appli funciton on igpa objects
+listed_igraph<-
+lapply(listed_igraph, fiter_on_weight)
+
+
+# re-make the plots
+Degree_histogram_with_name(listed_igraph)
+Weight_histogram_with_name(listed_igraph)
+
+```
+
 ##### 6.5 - Compare against a random network
 
 Our network is useless if we can't tell it apart from a random network with the same number of nodes and edges. it is OK to ahve a few metrics in a few networks that are still similar to a random network, but pay attention and record this when selecting your cut-offs
@@ -219,59 +253,7 @@ as.data.frame(map(list_random_VS_real_1000, 2)) # is the real network different 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#has to be tested with els' stuff
-
-##### 6.6 - Define network node proprieties
-Now that we know our networks differ from random we can check their general proprieties. this can help us compare multiple different network we create, telling apart treatment or sample type effects ~ puttig the results on a PCA migt be a good idea.. also, check if your metrics increase or decrease according gradients you may have in your experiments
-
-```{r}
-
-# on a list of networks
-list_partial_network_metrics <- map(listed_igraph, Generate_RealNetworks_metrics)
-
-# we still have a few more metrics to add in the following chunks
-
-# *************************** Done!
-```
-
-
-###### 6.6.1 - Generate node metrics
-
-```{r}
-# The Generate_node_metrics2( custom) function will calculate a set of node metrics you may be interested in exploring
-
-node_metrics <- mapply(function(x, y) {
-  Generate_node_metrics2(x, y)
-},
-x = listed_igraph,
-y = ps_list_network,
-SIMPLIFY = FALSE
-)
-```
-
 Pedro to do:
-* change insect .csvfeature names from "(" and  "." to "_"
-* match bacteria and isnect samples acoding plant number (above)
-* only run networks for week 4 and week 16. in case f errors, focus on week 16. one model for pot, one model for field.
-* run an RF model to find ASVs that separate time points. one model for pot, one model for field.
-* run RF model to find ASVs that separate treatments. one model for pot, one model for field.
 * add plant biomass to network modules
 
 
@@ -366,20 +348,10 @@ write.csv(list_network_metrics, "./Results/network_metrics.csv")
 # run the custom function on a list
 library(ggrepel)
 keystone_list <- map(node_metrics, KeystoneDetector3)
+
+view(node_metrics$bac_insct_field_ps)
 complete_node_metrics<-node_metrics
-# add the keystone definitions to the node metric dataframe
-complete_node_metrics <- mapply(function(x, y) {
-  merge(x, # the Generate_node_metrics2() output
-    y[[2]][, c(1, 18)], # keeps only the ASV number and keystone definition
-    #  by.x = 0, # merge by rownames for object x
-    #  by.y = "names", # merge by the collumn named "names" in object y
-    all.x = TRUE
-  )
-}, # keep rows even if they ahve data missing, in this case ZiPi outside the main component
-x = node_metrics,
-y = keystone_list,
-SIMPLIFY = FALSE
-)
+
 ```
 
 ###### 6.6.4 - add OTU abundances to the node metric dataframe
@@ -395,15 +367,24 @@ Here we will add the OTU frequency under each treatment and niche to the node ta
 ############################################################################################################
 ############################################################################################################
 
-# add total number of rarefied sequences of the OTU
-ps_list_rarefied # 4-split, rarefied
-ps_list_treat # 4 treaments of the 4-split, rarefied
-
-
-# total number of seuqneces of this OTU in the 4-slice
-total_per_slice <- lapply(ps_list_rarefied, function(x) {
-  rowSums(otu_table(x))
-})
+# get the total reads per treatments
+freq_per_treat<-
+  lapply(ps_list_network, function(x){
+    
+    Total_freq<-x%>%otu_table()%>%rowSums()
+    MW<-subset_samples(x, Treatment =="MW")%>%otu_table()%>%rowSums()
+    MAN<-subset_samples(x, Treatment =="MAN")%>%otu_table()%>%rowSums()
+    HC<-subset_samples(x, Treatment =="HC")%>%otu_table()%>%rowSums()
+    BSF<-subset_samples(x, Treatment =="BSF")%>%otu_table()%>%rowSums()
+    CHI<-subset_samples(x, Treatment =="CHI")%>%otu_table()%>%rowSums()
+    CO<-subset_samples(x, Treatment =="CO")%>%otu_table()%>%rowSums()
+    
+    
+    output<-data.frame(Total_freq,MW, MAN, HC, BSF, CHI, CO)
+    
+  return(output)
+  })
+  
 
 
 # add this total number of sequences to the node_metrics list
@@ -416,201 +397,12 @@ complete_node_metrics <- mapply(function(x, y) {
   )
 }, # keep rows even if they ahve data missing, in this case ZiPi outside the main component
 x = complete_node_metrics,
-y = total_per_slice,
+y = freq_per_treat,
 SIMPLIFY = FALSE
 )
 
-# boooo bad conding to change names of clumns on a list
-colnames(complete_node_metrics$Arabidopsis_thaliana.Root)[19] <- "freq_in_4slice"
-colnames(complete_node_metrics$Arabidopsis_thaliana.Soil)[19] <- "freq_in_4slice"
-colnames(complete_node_metrics$Brassica_oleraceae.Root)[19] <- "freq_in_4slice"
-colnames(complete_node_metrics$Brassica_oleraceae.Soil)[19] <- "freq_in_4slice"
-
-# add treatment row sums to AT_root
-total_per_treat_AT_root <- lapply(ps_list_treat$Arabidopsis_thaliana.Root, function(x) {
-  rowSums(otu_table(x))
-})
 
 
-complete_node_metrics$Arabidopsis_thaliana.Root <- merge(
-  x = complete_node_metrics$Arabidopsis_thaliana.Root, # the Generate_node_metrics2() output
-  y = total_per_treat_AT_root$control, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Arabidopsis_thaliana.Root)[20] <- "freq_in_control"
-
-
-complete_node_metrics$Arabidopsis_thaliana.Root <- merge(
-  x = complete_node_metrics$Arabidopsis_thaliana.Root, # the Generate_node_metrics2() output
-  y = total_per_treat_AT_root$MeJA_0.1, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Arabidopsis_thaliana.Root)[21] <- "freq_in_MeJA_0.1"
-
-complete_node_metrics$Arabidopsis_thaliana.Root <- merge(
-  x = complete_node_metrics$Arabidopsis_thaliana.Root, # the Generate_node_metrics2() output
-  y = total_per_treat_AT_root$MeJA_1.0, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Arabidopsis_thaliana.Root)[22] <- "freq_in_MeJA_1.0"
-
-complete_node_metrics$Arabidopsis_thaliana.Root <- merge(
-  x = complete_node_metrics$Arabidopsis_thaliana.Root, # the Generate_node_metrics2() output
-  y = total_per_treat_AT_root$oral_secretion, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Arabidopsis_thaliana.Root)[23] <- "freq_in_oral_secretion"
-
-
-
-# add treatment row sums to AT_soil
-total_per_treat_AT_Soil <- lapply(ps_list_treat$Arabidopsis_thaliana.Soil, function(x) {
-  rowSums(otu_table(x))
-})
-
-
-complete_node_metrics$Arabidopsis_thaliana.Soil <- merge(
-  x = complete_node_metrics$Arabidopsis_thaliana.Soil, # the Generate_node_metrics2() output
-  y = total_per_treat_AT_Soil$control, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Arabidopsis_thaliana.Soil)[20] <- "freq_in_control"
-
-
-complete_node_metrics$Arabidopsis_thaliana.Soil <- merge(
-  x = complete_node_metrics$Arabidopsis_thaliana.Soil, # the Generate_node_metrics2() output
-  y = total_per_treat_AT_Soil$MeJA_0.1, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Arabidopsis_thaliana.Soil)[21] <- "freq_in_MeJA_0.1"
-
-complete_node_metrics$Arabidopsis_thaliana.Soil <- merge(
-  x = complete_node_metrics$Arabidopsis_thaliana.Soil, # the Generate_node_metrics2() output
-  y = total_per_treat_AT_Soil$MeJA_1.0, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Arabidopsis_thaliana.Soil)[22] <- "freq_in_MeJA_1.0"
-
-complete_node_metrics$Arabidopsis_thaliana.Soil <- merge(
-  x = complete_node_metrics$Arabidopsis_thaliana.Soil, # the Generate_node_metrics2() output
-  y = total_per_treat_AT_Soil$oral_secretion, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Arabidopsis_thaliana.Soil)[23] <- "freq_in_oral_secretion"
-
-# add treatment row sums to BO_root
-total_per_treBO_BO_root <- lapply(ps_list_treat$Brassica_oleraceae.Root, function(x) {
-  rowSums(otu_table(x))
-})
-
-
-complete_node_metrics$Brassica_oleraceae.Root <- merge(
-  x = complete_node_metrics$Brassica_oleraceae.Root, # the Generate_node_metrics2() output
-  y = total_per_treBO_BO_root$control, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Brassica_oleraceae.Root)[20] <- "freq_in_control"
-
-
-complete_node_metrics$Brassica_oleraceae.Root <- merge(
-  x = complete_node_metrics$Brassica_oleraceae.Root, # the Generate_node_metrics2() output
-  y = total_per_treBO_BO_root$MeJA_0.1, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Brassica_oleraceae.Root)[21] <- "freq_in_MeJA_0.1"
-
-complete_node_metrics$Brassica_oleraceae.Root <- merge(
-  x = complete_node_metrics$Brassica_oleraceae.Root, # the Generate_node_metrics2() output
-  y = total_per_treBO_BO_root$MeJA_1.0, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Brassica_oleraceae.Root)[22] <- "freq_in_MeJA_1.0"
-
-complete_node_metrics$Brassica_oleraceae.Root <- merge(
-  x = complete_node_metrics$Brassica_oleraceae.Root, # the Generate_node_metrics2() output
-  y = total_per_treBO_BO_root$oral_secretion, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Brassica_oleraceae.Root)[23] <- "freq_in_oral_secretion"
-
-
-
-# add treatment row sums to BO_soil
-total_per_treBO_BO_Soil <- lapply(ps_list_treat$Brassica_oleraceae.Soil, function(x) {
-  rowSums(otu_table(x))
-})
-
-
-complete_node_metrics$Brassica_oleraceae.Soil <- merge(
-  x = complete_node_metrics$Brassica_oleraceae.Soil, # the Generate_node_metrics2() output
-  y = total_per_treBO_BO_Soil$control, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Brassica_oleraceae.Soil)[20] <- "freq_in_control"
-
-
-complete_node_metrics$Brassica_oleraceae.Soil <- merge(
-  x = complete_node_metrics$Brassica_oleraceae.Soil, # the Generate_node_metrics2() output
-  y = total_per_treBO_BO_Soil$MeJA_0.1, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Brassica_oleraceae.Soil)[21] <- "freq_in_MeJA_0.1"
-
-complete_node_metrics$Brassica_oleraceae.Soil <- merge(
-  x = complete_node_metrics$Brassica_oleraceae.Soil, # the Generate_node_metrics2() output
-  y = total_per_treBO_BO_Soil$MeJA_1.0, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Brassica_oleraceae.Soil)[22] <- "freq_in_MeJA_1.0"
-
-complete_node_metrics$Brassica_oleraceae.Soil <- merge(
-  x = complete_node_metrics$Brassica_oleraceae.Soil, # the Generate_node_metrics2() output
-  y = total_per_treBO_BO_Soil$oral_secretion, # keeps only the ASV number and keystone definition
-  by.x = "Row.names", # merge by rownames for object x)
-  by.y = 0,
-  all.x = TRUE
-) # keep rows even if
-colnames(complete_node_metrics$Brassica_oleraceae.Soil)[23] <- "freq_in_oral_secretion"
-
-
-
-complete_node_metrics
-
-###############################################
-###############################################
-# nightmare ends here but will haunt us later##
-###############################################
-###############################################
 ```
 
 
@@ -622,11 +414,8 @@ we will now use the edge file to import it as a network file to cytoscape. then 
 ```{r}
 
 # remove NAs as they may crash cytoscape
-
 complete_node_metrics$bac_insct_field_ps[is.na(complete_node_metrics$bac_insct_field_ps)] <- ""
 complete_node_metrics$bac_insct_pot_ps[is.na(complete_node_metrics$bac_insct_pot_ps)] <- ""
-
-
 
 
 # save these network metrics externally. we will do this manually for only 4 networks
@@ -655,3 +444,38 @@ write.csv(
 )
 ```
 
+
+# define correlations of modules with number of flowers
+
+```{r}
+ps_list_network$bac_insct_field_ps@sam_data
+
+#load plant biomass data
+biomass<-read.csv2(file = "./Data/plant_biomass.csv", row.names = 1)
+
+#merge it with phyloseq metadata
+ps_list_network_meta<-
+lapply(ps_list_network, function(x){
+  biomass_ps<-sample_data(biomass)
+  x<-merge_phyloseq(x, biomass_ps)
+  return(x)
+})
+
+
+
+library("WGCNA")
+eing<-
+  mapply(function (x,y)
+  adjustInput_run_eigen_correlation_adjustOutput(
+    igraph_obj = x,
+    phyloseq_obj = y),
+  x = listed_igraph,
+  y = ps_list_network_meta,
+  SIMPLIFY = FALSE)
+
+# check correlation table
+lapply(eing, function(x) filter(x, nodes_in_module>2))
+
+
+
+```

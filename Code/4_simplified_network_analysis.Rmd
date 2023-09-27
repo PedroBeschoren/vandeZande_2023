@@ -39,7 +39,7 @@ lapply(physeq_rarefied_l, function (x) {
 insect_ps@tax_table<-insect_ps@tax_table[,1:5]
 
 # keep only the timepoints 4, 16
-insect_ps<-subset_samples(insect_ps, Observation %in% c(4,16))
+insect_ps<-subset_samples(insect_ps, Observation %in% c(16))
 physeq_rarefied_l<-physeq_rarefied_l[c(1, 4, 5, 8)]
 
 # make list to match microbiome
@@ -53,7 +53,8 @@ insect_ps_soil_l<-phyloseq_sep_variable(insect_ps, variable = c("Soil", "Observa
 # apply filter function on list of phyloseq objects - account for at least 1% of the reads in a sample & be present in at least 25% of the samples
 ps_list_network_microbe <- lapply(physeq_rarefied_l, function(x) filterPhyseq(x, 0.01, 25))
 
-ps_list_network_insect <-insect_ps_soil_l
+ps_list_network_insect <- lapply(insect_ps_soil_l, function(x) filterPhyseq(x, 0.005, 12.5))
+
 
 
 #capitalize some sample names in microbiome
@@ -111,6 +112,10 @@ bac_insct_pot_ps<-merge_phyloseq(bac_insct_pot_otu, bac_insct_pot_tax, bac_insct
 #save as list for network input
 ps_list_network<-list("bac_insct_field_ps" = bac_insct_field_ps,
                       "bac_insct_pot_ps" = bac_insct_pot_ps)
+
+
+
+
 
 
 ```
@@ -379,7 +384,7 @@ Here we will add the OTU frequency under each treatment and niche to the node ta
 
 # get the total reads per treatments
 freq_per_treat<-
-  lapply(ps_list_network, function(x){
+  lapply(ps_list_network[1:2], function(x){
     
     Total_freq<-x%>%otu_table()%>%rowSums()
     MW<-subset_samples(x, Treatment =="MW")%>%otu_table()%>%rowSums()

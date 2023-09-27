@@ -47,8 +47,14 @@ physeq_rarefied <- rarefy_even_depth(
                                       trimOTUs = TRUE,
                                       verbose = TRUE)
 
-#separate phyloseq objects
 
+
+#adjsut order of treatment factors, pallete
+physeq_rarefied@sam_data$Treatment<-
+factor(physeq_rarefied@sam_data$Treatment, levels = c("Control", "Manure", "Chitin", "BSF", "HC", "MW"))
+pallete_els<-c("#000000", "#767171", "#AFABAB","#2F5597","#FFC000","#548235")
+
+#separate phyloseq objects
 physeq_rarefied_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Soil_type", "Time_point"))
 physeq_rarefied_soiltype_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Soil_type"))
 
@@ -83,7 +89,8 @@ NMDS_all_samples<-plot_ordination(
   theme_classic() +
   theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
   geom_point(aes(size = Time_point), alpha = 1) +
-  theme(legend.position = "right")
+  theme(legend.position = "right")+
+  scale_color_manual(values=pallete_els)
 
 ggsave(NMDS_all_samples, filename = "./Results/NMDS_all_samples.pdf",
        width = 180,
@@ -100,7 +107,8 @@ NMDS_all_samples2<-plot_ordination(
   theme_classic() +
   theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
   geom_point(aes(size = Time_point), alpha = 1) +
-  theme(legend.position = "right")
+  theme(legend.position = "right")+
+  scale_color_manual(values=pallete_els)
 
 ggsave(NMDS_all_samples2, filename = "./Results/NMDS_all_samples2.pdf",
        width = 180,
@@ -118,7 +126,7 @@ NMDS_all_samples3<-plot_ordination(
   theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
   theme(legend.position = "right")+
   facet_wrap(~Soil_type)+
-  scale_colour_grey()
+  scale_color_manual(values=pallete_els)
 
 ggsave(NMDS_all_samples3, filename = "./Results/NMDS_all_samples3.pdf",
        width = 180,
@@ -152,7 +160,8 @@ NMDS_listing <- function(physeq_list) { # first the name of the new function you
       labs(subtitle = paste("Stress:", round(y$stress, digits = 4))) + # this adds the NMDS stress to the plot as subtitle
       theme(plot.title = element_text(size = 10, face = "bold")) + # options for the title
       geom_point(aes(size = Time_point), alpha = 1) +
-      theme(legend.position = "right")
+      theme(legend.position = "right")+
+      scale_color_manual(values=pallete_els)
   }, # position for the legend
   x = physeq_list, # note that you only define x here, after you define your plot function
   y = NMDS_list, # note that you only definee y here, after you define your plot function
@@ -501,11 +510,11 @@ shannon_topsoil_plot<-
     geom_boxplot(alpha = 0.4, outlier.shape = NA)+
     geom_dotplot(binaxis = "y", stackdir = "center", position = position_dodge(width = .75), dotsize = 0.3)+
     theme_bw()+
+    scale_fill_manual(values=pallete_els)+
     labs(title = "Shannon diversity")+
     ylab("Shannon diversity index")+
     xlab("Time points")+
     facet_wrap(~Soil_type)
-
 #save shannon plot
 ggsave(shannon_topsoil_plot, filename = "./Results/shannon_plot.pdf",
        width = 180,

@@ -50,8 +50,16 @@ insect_ps<-merge_phyloseq(Insect_features, Insect_metadata, Insect_taxonomy)
 #remove insects occuring less tha 8 times (they amke some calculations more dificult, and will hardly provide a key insight)
 otu_table(insect_ps) <- otu_table(insect_ps)[which(rowSums(otu_table(insect_ps)) > 7), ] 
 
+#adjsut order of treatment factors, pallete
+insect_ps@sam_data$Treatment<-
+factor(insect_ps@sam_data$Treatment, levels = c("CO", "MAN", "CHI", "BSF", "HC", "MW"))
+pallete_els<-c("#000000", "#767171", "#AFABAB","#2F5597","#FFC000","#548235")
+
+
 #save externally
 save(insect_ps, file = "./Data/insect_ps.RData")
+
+
 
 
 
@@ -297,6 +305,7 @@ shannon_loess_plot<-
  geom_point() +
   geom_smooth(se = TRUE, method = loess, fullrange = FALSE, span = 0.75, fill = "Grey")+  
      theme_bw()+
+    scale_color_manual(values=pallete_els)+
   facet_wrap(~ Soil )
 
 
@@ -313,6 +322,7 @@ shannon_box_plot<-
   ggplot(taxon_diversity, aes(x =Observation , y = shannon, fill=Treatment))+
     geom_boxplot(alpha = 0.4, outlier.shape = NA, position = "dodge")+
     theme_bw()+
+  scale_fill_manual(values=pallete_els)+
     labs(title = "Shannon diversity")+
     ylab("Shannon diversity index")+
     xlab("Time points")+

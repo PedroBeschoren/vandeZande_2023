@@ -56,6 +56,8 @@ pallete_els<-c("#000000", "#767171", "#AFABAB","#2F5597","#FFC000","#548235")
 
 #separate phyloseq objects
 physeq_rarefied_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Soil_type", "Time_point"))
+physeq_rarefied_time_treatment_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Treatment", "Time_point"))
+physeq_rarefied_time_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Time_point"))
 physeq_rarefied_soiltype_l<-phyloseq_sep_variable(physeq_rarefied, variable = c("Soil_type"))
 
 #save sepaated objects externaly
@@ -289,11 +291,33 @@ permanova_with_blocks <- function(phyloseq_list, rhs_model) {
   })
 }
 
+# define a function to take the permanova results and display them on a flextable
+permanova_to_flextable <- function (permanova_with_blocks_output){
+  
+  #save as dataframe, adjust rownames
+  table_df<-as.data.frame(permanova_with_blocks_output)
+  table_df<-rownames_to_column(table_df, var = "Factor")
+  
+
+  #round values, reduce numebr of digits
+  table_df$SumOfSqs<-round(table_df$SumOfSqs, digits = 3)
+  table_df$R2<-round(table_df$R2, digits = 3)
+  table_df$F<-round(table_df$F, digits = 3)
+  
+  output<-flextable(table_df)
+  
+  return(output)
+  
+  
+}
+
 permanova_tables<-permanova_with_blocks(phyloseq_list = physeq_rarefied_l,rhs_model = "Treatment")
 
 # save and export as flextable
 library("flextable")
 library(tibble)
+
+
 permanova_df_l<-lapply(permanova_tables, function(x){
   
   #save as dataframe, adjust rownames
@@ -330,10 +354,39 @@ save_as_docx(flextable_l$Field.Week.4,
 
 
 
+# compare field sampls to pot samples (simple model with all samples
+permanova_tables_b<-permanova_with_blocks(phyloseq_list = list(physeq_rarefied),
+                                        rhs_model = "Treatment*Soil_type*Time_point")
+
+all_samples_model<-permanova_to_flextable(permanova_tables_b)
+
+save_as_docx(all_samples_model, 
+             path = "./Results/PERMANOVA_microbiome_Treatment.Soil_type.Time_point.docx")
+
+
+# compare field and soil at each time point
+permanova_tables_c<-permanova_with_blocks(phyloseq_list = physeq_rarefied_time_l,
+                                          rhs_model = "Treatment*Soil_type")
+
+split_by_time_model<-lapply(permanova_tables_c, permanova_to_flextable)
+
+save_as_docx(split_by_time_model, 
+             values = split_by_time_model, 
+             path = "./Results/PERMANOVA_microbiome_Treatment.Soil_type.docx")
 
 
 
 
+# compare soil time under each time point and treatment
+permanova_tables_d<-permanova_with_blocks(phyloseq_list = physeq_rarefied_time_treatment_l,
+                                          rhs_model = "Soil_type")
+
+
+split_by_time_treatment_model<-lapply(permanova_tables_d, permanova_to_flextable)
+
+save_as_docx(split_by_time_treatment_model, 
+             values = split_by_time_treatment_model, 
+             path = "./Results/PERMANOVA_microbiome_Soil_type.docx")
 
 
 

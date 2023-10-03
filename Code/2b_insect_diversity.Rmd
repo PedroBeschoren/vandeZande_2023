@@ -58,6 +58,7 @@ pallete_els<-c("#000000", "#767171", "#AFABAB","#2F5597","#FFC000","#548235")
 
 #save externally
 save(insect_ps, file = "./Data/insect_ps.RData")
+load(file = "./Data/insect_ps.RData")
 
 
 
@@ -147,6 +148,12 @@ ggsave(PCoA_insect_all_samples, filename = "./Results/PCoA_2_3_insect_all_sample
 # split ps object
 insect_ps_l<-phyloseq_sep_variable(insect_ps, variable = c("Soil", "Treatment"))
 insect_ps_soil_l<-phyloseq_sep_variable(insect_ps, variable = c("Soil"))
+
+#remove empty rows
+insect_ps_soil_l<- lapply(insect_ps_soil_l, function(x)
+  prune_samples(samples = colSums(x@otu_table)>0, x = x))
+
+
 
 
  #define custom fucntion to plot a list of NMDS results
@@ -297,6 +304,10 @@ permanova_df_l<-lapply(permanova_tables, function(x){
   taxon_diversity<-microbiome::diversity(insect_ps,index = "Shannon")
   merg_to_ps<-sample_data(taxon_diversity) 
   taxon_diversity<-as(sample_data(merge_phyloseq(insect_ps,merg_to_ps)),"data.frame") 
+  
+  #adjsut factors
+  taxon_diversity$Soil<-as.factor(taxon_diversity$Soil)
+  taxon_diversity$Observation<-as.factor(taxon_diversity$Observation)
 
 
 # plot diversity from topsoils
@@ -340,18 +351,65 @@ ggsave(shannon_box_plot, filename = "./Results/insect_shannon_box_plot.pdf",
 
 ```
 
+# alpha diversity testing - all samples
 ```{r}
 
 
 # check homogeniety of variances in alpha diversity
 library(car)
-leveneTest((shannon) ~ Treatment*Soil*as.factor(Observation), data = taxon_diversity) 
+leveneTest((shannon) ~ Treatment*Soil*Observation, data = taxon_diversity) 
 
 #two-way anova, shanon diversity index
-  tx <- with(taxon_diversity, interaction(Treatment,Soil,as.factor(Observation))) #needed for tukey to test interaction
+  tx <- with(taxon_diversity, interaction(Treatment,Soil,Observation)) #needed for tukey to test interaction
   aovTukey<-aov(shannon ~ tx, data = taxon_diversity)#needed for tukey to test interaction
   anova_test<-Anova(lm((shannon) ~Treatment*Soil*as.factor(Observation), data = taxon_diversity, contrasts=list(Treatment=contr.sum, Soil=contr.sum, Observation = contr.sum)), type = "2") 
-  tukey_result<-TukeyHSD(aovTukey, "tx", group=TRUE, console=TRUE)#post-hoc
+   out_tuk<-HSD.test(aovTukey, trt = "tx")
+   tukey_group_ft<-flextable(rownames_to_column(out_tuk$groups, var = "Factor"))
+
+  
+  anova_test$`Sum Sq`<-round(anova_test$`Sum Sq`, digits = 3)
+  anova_test$`F value`<-round(anova_test$`F value`, digits = 3)
+  anova_test$`Pr(>F)`<-round(anova_test$`Pr(>F)`, digits = 3)
+  anova_test_df<-as.data.frame(anova_test)
+  anova_test_df<- rownames_to_column(anova_test_df, var = "Factor")
+  anova_test_ft<-flextable(anova_test_df)
+  
+
+  
+  
+  #flextable of pairwside comparsions
+  save_as_docx(anova_test_ft,
+               path = "./Results/shannon_anova_insect.docx") # 18k pairwise comparisons...
+   save_as_docx(tukey_group_ft,
+               path = "./Results/shannon_anova_insect_tukey.docx") # 18k pairwise comparisons...
+  
+  
+
+```
+
+
+# alpha diversity testing - split by soil type
+```{r}
+
+#split df into list
+taxon_diversity_soil_l<-base::split(x = taxon_diversity, f = taxon_diversity$Soil) 
+taxon_diversity_soil_obs_l<-base::split(x = taxon_diversity, f = list(taxon_diversity$Soil, taxon_diversity$Observation)) 
+
+
+library(agricolae)
+# run whole alpha diversity testing over list
+shannon_testing_per_soil<-
+lapply(taxon_diversity_soil_l, function(taxon_diversity){
+
+print(leveneTest((shannon) ~ Treatment*Observation, data = taxon_diversity) )
+
+#two-way anova, shanon diversity index
+  tx <- with(taxon_diversity, interaction(Treatment,Observation)) #needed for tukey to test interaction
+  aovTukey<-aov(shannon ~ tx, data = taxon_diversity)#needed for tukey to test interaction
+  anova_test<-Anova(lm((shannon) ~Treatment*Observation, data = taxon_diversity, contrasts=list(Treatment=contr.sum, Observation = contr.sum)), type = "2") 
+
+ tukey_group_ft<-flextable(rownames_to_column(out_tuk$groups, var = "Factor"))
+
   
 
   
@@ -362,15 +420,108 @@ leveneTest((shannon) ~ Treatment*Soil*as.factor(Observation), data = taxon_diver
   anova_test_df<- rownames_to_column(anova_test_df, var = "Factor")
   anova_test_ft<-flextable(anova_test_df)
   
+  return(list(anova_test_ft, tukey_group_ft))
   
-  #flextable of pairwside comparsions
-  save_as_docx(anova_test_ft,
-               path = "./Results/shannon_anova_insect.docx")
+})
+
+#export anova result
+save_as_docx(shannon_testing_per_soil$Field,
+             values = shannon_testing_per_soil$Field,
+             path = "./Results/shannon_anova_insect_Field.docx")
+
+#export anova result
+save_as_docx(shannon_testing_per_soil$Pot,
+             values = shannon_testing_per_soil$Pot,
+             path = "./Results/shannon_anova_insect_pot.docx")
+
+
   
+  
+  
+  
+
   
 ```
 
 
+# alpha diversity testing - split by soil type and observation
+```{r}
+
+#split df into list
+taxon_diversity_soil_obs_l<-base::split(x = taxon_diversity, f = list(taxon_diversity$Soil, taxon_diversity$Observation)) 
+
+
+library(agricolae)
+# run whole alpha diversity testing over list
+shannon_testing_per_soil_observation<-
+lapply(taxon_diversity_soil_obs_l, function(taxon_diversity){
+
+levene_out<-print(leveneTest((shannon) ~ Treatment, data = taxon_diversity) )
+
+#two-way anova, shanon diversity index
+  tx <- with(taxon_diversity, interaction(Treatment)) #needed for tukey to test interaction
+  aovTukey<-aov(shannon ~ tx, data = taxon_diversity)#needed for tukey to test interaction
+  anova_test<-Anova(lm((shannon) ~Treatment, data = taxon_diversity, contrasts=list(Treatment=contr.sum)), type = "2") 
+ out_tuk<-HSD.test(aovTukey, trt = "tx")
+ tukey_group_ft<-flextable(rownames_to_column(out_tuk$groups, var = "Factor"))
+
+  
+
+  
+  anova_test$`Sum Sq`<-round(anova_test$`Sum Sq`, digits = 3)
+  anova_test$`F value`<-round(anova_test$`F value`, digits = 3)
+  anova_test$`Pr(>F)`<-round(anova_test$`Pr(>F)`, digits = 3)
+  anova_test_df<-as.data.frame(anova_test)
+  anova_test_df<- rownames_to_column(anova_test_df, var = "Factor")
+  anova_test_ft<-flextable(anova_test_df)
+  
+  return(list(anova_test_df, tukey_group_ft, levene_out))
+  
+})
+
+########################## put all anovas into a single df
+sha_test_soil_obs<-
+  lapply(shannon_testing_per_soil_observation, function(x) x[[1]])
+sha_test_soil_obs<-do.call("rbind", sha_test_soil_obs)
+
+#tunr NA into ""
+sha_test_soil_obs[is.na(sha_test_soil_obs)]<-""
+
+#adjust p values
+sha_test_soil_obs$adjusted_p_value<-p.adjust(p = sha_test_soil_obs$`Pr(>F)`, method = "fdr")
+
+#adjust rownames
+sha_test_soil_obs<-rownames_to_column(sha_test_soil_obs, var = "dataset")
+sha_test_soil_obs$dataset<-gsub(pattern = "..$", replacement = "",x = sha_test_soil_obs$dataset)
+sha_test_soil_obs_ft<-flextable(sha_test_soil_obs)
+
+#export anova result
+save_as_docx(values = sha_test_soil_obs_ft,
+             path = "./Results/shannon_anova_insect_Field_observation.docx")
+
+########################## put all tukeys into a single df
+
+sha_tuk_soil_obs<-
+  lapply(shannon_testing_per_soil_observation, function(x) x[[2]])
+
+
+#tunr NA into ""
+sha_tuk_soil_obs[is.na(sha_tuk_soil_obs)]<-""
+
+#adjust rownames
+sha_tuk_soil_obs<-rownames_to_column(sha_tuk_soil_obs, var = "dataset")
+sha_tuk_soil_obs$dataset<-gsub(pattern = "..$", replacement = "",x = sha_tuk_soil_obs$dataset)
+sha_tuk_soil_obs_ft<-flextable(values(sha_tuk_soil_obs))
+
+#export anova result
+save_as_docx(values = sha_tuk_soil_obs,
+             path = "./Results/shannon_anova_insect_Field_observation_tukey.docx")
+
+  
+
+```
+
+# heattree of insect diversity epr treatment
 ```{r}
 
 #load libraries

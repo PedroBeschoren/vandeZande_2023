@@ -497,7 +497,7 @@ sha_test_soil_obs_ft<-flextable(sha_test_soil_obs)
 
 #export anova result
 save_as_docx(values = sha_test_soil_obs_ft,
-             path = "./Results/shannon_anova_insect_Field_observation.docx")
+             path = "./Results/shannon_anova_insect_soil_observation.docx")
 
 ########################## put all tukeys into a single df
 
@@ -515,7 +515,7 @@ sha_tuk_soil_obs_ft<-flextable(values(sha_tuk_soil_obs))
 
 #export anova result
 save_as_docx(values = sha_tuk_soil_obs,
-             path = "./Results/shannon_anova_insect_Field_observation_tukey.docx")
+             path = "./Results/shannon_anova_insect_soil_observation_tukey.docx")
 
   
 

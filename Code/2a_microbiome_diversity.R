@@ -580,13 +580,15 @@ ggsave(shannon_topsoil_plot, filename = "./Results/shannon_plot.pdf",
 
 # check homogeniety of variances in alpha diversity
 library(car)
+library(agricolae)
 leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity) 
 
 #two-way anova, shanon diversity index
   tx <- with(taxon_diversity, interaction(Treatment,Soil_type,Time_point)) #needed for tukey to test interaction
   aovTukey<-aov(shannon ~ tx, data = taxon_diversity)#needed for tukey to test interaction
   anova_test<-Anova(lm((shannon) ~Treatment*Soil_type*Time_point, data = taxon_diversity, contrasts=list(Treatment=contr.sum, Soil_type=contr.sum, Time_point = contr.sum)), type = "2") 
-  tukey_result<-TukeyHSD(aovTukey, "tx", group=TRUE, console=TRUE)#post-hoc
+  out_tuk<-HSD.test(aovTukey, trt = "tx")
+  tukey_group_ft<-flextable(rownames_to_column(out_tuk$groups, var = "Factor"))
   
 
   
@@ -600,7 +602,88 @@ leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity)
   
   #flextable of pairwside comparsions
   save_as_docx(anova_test_ft,
-               path = "./Results/shannon_anova.docx")
+               path = "./Results/shannon_anova_microbiome.docx")
+  save_as_docx(tukey_group_ft,
+               path = "./Results/shannon_anova_microbiome_tukey.docx")
+  
+  
+  
+  
+  
+  
+  
+  ### alpha diversity, split by soil type and time point ####
+  
+  
+  #split df into list
+  taxon_diversity_soil_obs_l<-base::split(x = taxon_diversity, f = list(taxon_diversity$Soil_type  , taxon_diversity$Time_point )) 
+  
+  
+  library(agricolae)
+  # run whole alpha diversity testing over list
+  shannon_testing_per_soil_observation<-
+    lapply(taxon_diversity_soil_obs_l, function(taxon_diversity){
+      
+      levene_out<-print(leveneTest((shannon) ~ Treatment, data = taxon_diversity) )
+      
+      #two-way anova, shanon diversity index
+      tx <- with(taxon_diversity, interaction(Treatment)) #needed for tukey to test interaction
+      aovTukey<-aov(shannon ~ tx, data = taxon_diversity)#needed for tukey to test interaction
+      anova_test<-Anova(lm((shannon) ~Treatment, data = taxon_diversity, contrasts=list(Treatment=contr.sum)), type = "2") 
+      out_tuk<-HSD.test(aovTukey, trt = "tx")
+      tukey_group_ft<-flextable(rownames_to_column(out_tuk$groups, var = "Factor"))
+      
+      
+      
+      
+      anova_test$`Sum Sq`<-round(anova_test$`Sum Sq`, digits = 3)
+      anova_test$`F value`<-round(anova_test$`F value`, digits = 3)
+      anova_test$`Pr(>F)`<-round(anova_test$`Pr(>F)`, digits = 3)
+      anova_test_df<-as.data.frame(anova_test)
+      anova_test_df<- rownames_to_column(anova_test_df, var = "Factor")
+      anova_test_ft<-flextable(anova_test_df)
+      
+      return(list(anova_test_df, tukey_group_ft, levene_out))
+      
+    })
+  
+  ########################## put all anovas into a single df
+  sha_test_soil_obs<-
+    lapply(shannon_testing_per_soil_observation, function(x) x[[1]])
+  sha_test_soil_obs<-do.call("rbind", sha_test_soil_obs)
+  
+  #tunr NA into ""
+  sha_test_soil_obs[is.na(sha_test_soil_obs)]<-""
+  
+  #adjust p values
+  sha_test_soil_obs$adjusted_p_value<-p.adjust(p = sha_test_soil_obs$`Pr(>F)`, method = "fdr")
+  
+  #adjust rownames
+  sha_test_soil_obs<-rownames_to_column(sha_test_soil_obs, var = "dataset")
+  sha_test_soil_obs$dataset<-gsub(pattern = "..$", replacement = "",x = sha_test_soil_obs$dataset)
+  sha_test_soil_obs_ft<-flextable(sha_test_soil_obs)
+  
+  #export anova result
+  save_as_docx(sha_test_soil_obs_ft,
+               path = "./Results/shannon_anova_microbiome_soil_timepoint.docx")
+  
+  ########################## put all tukeys into a single df
+  
+  sha_tuk_soil_obs<-
+    lapply(shannon_testing_per_soil_observation, function(x) x[[2]])
+  
+
+  
+  #adjust rownames
+  sha_tuk_soil_obs<-rownames_to_column(sha_tuk_soil_obs, var = "dataset")
+  sha_tuk_soil_obs$dataset<-gsub(pattern = "..$", replacement = "",x = sha_tuk_soil_obs$dataset)
+  sha_tuk_soil_obs_ft<-flextable(values(sha_tuk_soil_obs))
+  
+  #export anova result
+  save_as_docx(values = sha_tuk_soil_obs,
+               path = "./Results/shannon_anova_microbiome_soil_timepoint_tukey.docx")
+  
+  
   
   
   

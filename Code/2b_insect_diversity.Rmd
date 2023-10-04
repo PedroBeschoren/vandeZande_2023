@@ -22,6 +22,9 @@ library(mia)
 library(tidyr)
 library(tibble)
 library(viridis)
+library(agricolae)
+library(car)
+library(flextable)
 
 ```
 
@@ -396,7 +399,7 @@ taxon_diversity_soil_l<-base::split(x = taxon_diversity, f = taxon_diversity$Soi
 taxon_diversity_soil_obs_l<-base::split(x = taxon_diversity, f = list(taxon_diversity$Soil, taxon_diversity$Observation)) 
 
 
-library(agricolae)
+
 # run whole alpha diversity testing over list
 shannon_testing_per_soil<-
 lapply(taxon_diversity_soil_l, function(taxon_diversity){
@@ -496,7 +499,7 @@ sha_test_soil_obs$dataset<-gsub(pattern = "..$", replacement = "",x = sha_test_s
 sha_test_soil_obs_ft<-flextable(sha_test_soil_obs)
 
 #export anova result
-save_as_docx(values = sha_test_soil_obs_ft,
+save_as_docx(sha_test_soil_obs_ft,
              path = "./Results/shannon_anova_insect_soil_observation.docx")
 
 ########################## put all tukeys into a single df

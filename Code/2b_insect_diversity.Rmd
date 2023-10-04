@@ -634,12 +634,12 @@ return(output)
 
 # turn NA classifications into "", previewing their complete removal from the tree; add microbiome type as metadata
 insect_ps@tax_table@.Data[is.na(insect_ps@tax_table)]<-""
-  
 
-subset_taxa(insect_ps, Family =="Pieridae")
-
-insect_ps@tax_table@.Data[,4]
-
+insect_ps_soil_l<- #NA to "" also for list of separated pot/field
+  lapply(insect_ps_soil_l, function(x){
+    x@tax_table@.Data[is.na(x@tax_table)]<-""
+    return(x)
+  })
 
 
 

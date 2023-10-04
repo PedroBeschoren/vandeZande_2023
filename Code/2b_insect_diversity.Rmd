@@ -634,22 +634,32 @@ return(output)
 
 # turn NA classifications into "", previewing their complete removal from the tree; add microbiome type as metadata
 insect_ps@tax_table@.Data[is.na(insect_ps@tax_table)]<-""
-  
 
-subset_taxa(insect_ps, Family =="Pieridae")
+insect_ps_soil_l<- #NA to "" also for list of separated pot/field
+  lapply(insect_ps_soil_l, function(x){
+    x@tax_table@.Data[is.na(x@tax_table)]<-""
+    return(x)
+  })
 
-insect_ps@tax_table@.Data[,4]
+# rearrange order of samples so the groups are identical across the 3 heat trees
+sample_names_sorted<-sort(sample_names(insect_ps))
+otu_table(insect_ps) <- otu_table(insect_ps)[, sample_names_sorted]
+
+field_sample_names_sorted<-sort(sample_names(insect_ps_soil_l$Field))
+otu_table(insect_ps_soil_l$Field) <- otu_table(insect_ps_soil_l$Field)[, field_sample_names_sorted]
+
+pot_sample_names_sorted<-sort(sample_names(insect_ps_soil_l$Pot))
+otu_table(insect_ps_soil_l$Pot) <- otu_table(insect_ps_soil_l$Pot)[, pot_sample_names_sorted]
 
 
-
-
+#calculate and plot heat tree
 heat_tree_insect<-
 phyloseq_to_heat_tree_matrix(ps_object = insect_ps, 
                              sample_group = "Treatment")
 
 
 
-#save shannon plot
+#export heat tree
 ggsave(heat_tree_insect, filename = "./Results/insect_heat_tree.pdf",
        width = 230,
        height = 230,
@@ -657,20 +667,22 @@ ggsave(heat_tree_insect, filename = "./Results/insect_heat_tree.pdf",
 
 
 
-
+#calculate and plot list of heat trees
 heat_tree_insect_l<-lapply(insect_ps_soil_l, function(x)
   phyloseq_to_heat_tree_matrix(ps_object = x, 
                              sample_group = "Treatment"))
 
 
-#save shannon plot
+
+
+#export heat tree
 ggsave(heat_tree_insect_l$Field, filename = "./Results/insect_heat_tree_field.pdf",
        width = 230,
        height = 230,
        units = "mm")
 
 
-#save shannon plot
+#export heat tree
 ggsave(heat_tree_insect_l$Pot, filename = "./Results/insect_heat_tree_pot.pdf",
        width = 230,
        height = 230,

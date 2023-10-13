@@ -499,7 +499,7 @@ write.csv(
 ```
 
 
-# define correlations of modules with number of flowers
+# define correlations of modules with biomas
 
 ```{r}
 ps_list_network$bac_insct_field_ps@sam_data
@@ -533,3 +533,118 @@ lapply(eing, function(x) filter(x, nodes_in_module>2))
 
 
 ```
+
+
+
+
+
+
+# define number of cross-kingdom interactions
+```{r}
+
+
+########
+weighted_l_selected_insect_bac<-
+mapply(function(x,y){
+  
+  #turn edges into df
+edge_df<-
+  as_long_data_frame(x)
+
+#define alpha and gamma proteobac ASV
+Arthropoda_ASV<-
+ dplyr::filter(y, Phylum  == "Arthropoda")$OTU
+
+bacterial_ASV<-
+  dplyr::filter(y, Phylum != "Arthropoda")$OTU
+
+# define: TRUE + TRUE = ALPHA TO GAMA
+insect_bac<-data.frame(
+edge_df[,6] %in% Arthropoda_ASV,
+edge_df[,7] %in% bacterial_ASV)
+
+# define: TRUE + TRUE = GAMA TO ALPHA
+bac_insect<-data.frame(
+edge_df[,6] %in% bacterial_ASV, 
+edge_df[,7] %in% Arthropoda_ASV)
+
+bac_bac<-data.frame(
+edge_df[,6] %in% bacterial_ASV, 
+edge_df[,7] %in% bacterial_ASV)
+
+insect_insect<-data.frame(
+edge_df[,6] %in% Arthropoda_ASV, 
+edge_df[,7] %in% Arthropoda_ASV)
+
+# if alpha-gama  or gama-alpha connection, tag is as "alpha_gama", else tag it as "other"
+is_insect_bac_edge<-
+ifelse(test = insect_bac[,1] & insect_bac[,2] |
+              bac_insect[,1] & bac_insect [,2] ==TRUE, 
+       yes = "insect_bac",
+       no = ifelse (test = bac_bac[,1] & bac_bac[,2] ==TRUE,
+                    yes = "bac_bac",
+                    no = "insect_insect"))
+
+#save vector as edge propriety
+edge_attr(graph = x, 
+          name = "is_insect_bac_edge") <- is_insect_bac_edge
+
+#return graph
+return(as_long_data_frame(x))
+  
+},
+  x = listed_igraph,
+  y = complete_node_metrics,
+  SIMPLIFY = FALSE)
+
+
+
+#makea plot after flattening list and changing names
+weighted_l_selected_insect_bac_df<-
+  do.call(rbind, weighted_l_selected_insect_bac)%>%rownames_to_column()
+
+weighted_l_selected_insect_bac_df$rowname<-
+  gsub(pattern = "[0-9][0-9]", replacement = "", x = weighted_l_selected_insect_bac_df$rowname)
+
+weighted_l_selected_insect_bac_df$rowname<-
+  gsub(pattern = "[0-9]", replacement = "", x = weighted_l_selected_insect_bac_df$rowname)
+
+colnames(weighted_l_selected_insect_bac_df)[1]<-"soil_type"
+
+#plot
+interkingdom_connection_plot<-
+  ggplot(data = weighted_l_selected_insect_bac_df, 
+         aes(x = is_insect_bac_edge, y = weight, fill = soil_type))+
+           geom_boxplot()+
+        geom_dotplot(binaxis = "y", stackdir = "center", position = position_dodge(width = .75), dotsize = 0.075)+
+    facet_wrap(~positive_negative )
+  
+#save plot
+  ggsave(interkingdom_connection_plot,filename = "./Results/network_interkingdom_connections_plot.pdf", 
+       width = 180, 
+       height = 180, 
+       units = "mm")
+
+  
+  
+  
+  #table of weights
+table_edge_type_freq<-
+lapply(weighted_l_selected_insect_bac, function(x)
+x%>%
+  group_by(is_insect_bac_edge, positive_negative)%>%
+  dplyr::summarise(n = n(),
+                   pct_edges = round(n()/nrow(x)*100, digits = 2),
+                   mean_weight = round(mean(weight), digits = 3))%>%
+  flextable())
+
+
+
+#save flextable as doc.x
+save_as_docx(values = table_edge_type_freq,
+             path = "./Results/network_interkingdom_connections.docx")
+
+
+```
+
+

@@ -22,6 +22,7 @@ library("SpiecEasi")
 library(igraph)
 library(purrr)
 library(tibble)
+library(flextable)
 source("./Code/Network_custom_functions.R") # source
 
 
@@ -252,6 +253,42 @@ set.seed(101)
 list_random_VS_real_1000 <- map(listed_igraph, Real_VS_random_networks)
 
 as.data.frame(map(list_random_VS_real_1000, 2)) # is the real network different from the random network?
+
+
+#save output as flextble
+rand_network_ft<-
+lapply(list_random_VS_real_1000, function(x){
+  
+  # round metrics from networks
+  x[[1]]<-round(x[[1]], digits = 3)
+  
+  #add TURE/FALSE as a column
+  x[[1]][5,]<-x[[2]]
+  
+  #adjsut clumn names
+  output<-rownames_to_column(x[[1]],var = "network_id")
+  
+  #adjust TUR/FALSE in lat column
+  output[5,2:9]<-ifelse(output[5,2:9]==1, yes = "TRUE", no = "FALSE")
+  
+  #adjsut clumn names
+  output$network_id [5]<-"Is_real_network_different_from_random_network?"
+  
+  #save as flextable
+  output<-flextable(output)
+  
+  return(output)
+  
+})
+
+
+
+
+#save flextable as docx
+save_as_docx(values = rand_network_ft,
+             path = "./Results/random_netowrk_comparison.docx")
+
+
 
 # *************************** Done!
 ```

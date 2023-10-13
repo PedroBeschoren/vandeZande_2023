@@ -648,4 +648,551 @@ save_as_docx(values = table_edge_type_freq,
 
 ```
 
+# !!!!!!! ALL insect vs all controls  !!!!! #####
+
+
+
+```{r}
+
+# merge all samples
+merged_ps<-merge_phyloseq(bac_insct_field_ps, bac_insct_pot_ps)
+
+
+# split by treatment
+ps_list_network<-
+  list("bac_insct_controls_ps" = subset_samples(merged_ps, 
+                                             Treatment %in% c("CO","MAN","CHI")),
+        "bac_insct_exuvie_ps" = subset_samples(merged_ps, 
+                                             Treatment %in% c("BSF","HC","MW")))
+
+
+
+
+
+
+
+# define pulsar parameters. when testing different parameters, reduce the rep.num to 50 to speed up calculations
+pargs <- list(rep.num = 75, seed = 10010, ncores = 1, thresh = 0.01)
+
+t0<-Sys.time()
+# run the main function to calculate the network. it can take several minutes to a couple hours
+list_spiec_objct <- lapply(ps_list_network, function(x) {
+  SpiecEasi::spiec.easi(x,
+    method = "glasso", # if you change methods to "mb" you will have to change detials in make_igrap() as commented in that function
+    lambda.min.ratio = 1e-2, # the higher the more edges, leading to higher density network. as it goes lower, computational times increases SUBSTANTIALLY. standard is 1e-3 but 1e-2 works well ; pedro's PC crahs when 1e-7
+    nlambda = 70, # number of slices between minimum amount of edges to maximum. low lavues dive more sparse networks, high values give denser networks. keep it between 10 and 100
+    sel.criterion = "bstars", # selects the lambda and modules the most stable connections
+    pulsar.select = TRUE,
+    pulsar.params = pargs
+  )
+}) # iteration of starts, n)
+t1<-Sys.time()
+t0-t1 # ~ 10 min 
+
+save(list_spiec_objct, file = "./Results/list_spiec_objct_tresh001_controls_VS_exu.RData")
+load(file = "./Results/list_spiec_objct_tresh001_controls_VS_exu.RData")
+
+```
+
+
+
+##### 6.3 - Make igraph object
+
+igraph is another package for netowrks that will let you acess and manipulate nodes, edges and their proprieties
+
+```{r}
+
+
+
+# the  make_igraph() custom function makes a weighted igraph object from the spiec.easi object. we need igraph objects to calculate network metrics
+listed_igraph <- mapply(function(x, y) {
+  make_igraph(x, y)
+},
+x = list_spiec_objct,
+y = ps_list_network,
+SIMPLIFY = FALSE
+)
+
+# we should now remove the spiec_easy oject ebcause it is really heavy
+rm(list_spiec_objct)
+# *************************** Done!
+
+
+```
+
+##### 6.4 - Check fit to power law, node degree distribution, and edge weight distribution
+
+ one of the best indicators for the reliability of your network is wether it fits a power law or not (many OTUs with low degree, few OTUs with high degree) while not all microbial networks will follow a power law, it is very convinient when we are looking for keystone species. we adopt this simplification even knowing it might not be a ground truth.
+
+```{r}
+
+
+# with this, we fit a power law and make a statistical test to the distribution on a list of networks
+power_law_list <- lapply(listed_igraph, function(x) fit_power_law(degree(x)))
+
+# this gives you the P values of the power law tests.
+map(power_law_list, 6)
+
+# Checks histogram of degree over lists of netwokrs. it should NOT be normal - expect a few OTUs with highe degree and many otus with low degree.
+# These functions  provide titles to the histogram lists, which is actually quick tricky to perofrm in R
+Degree_histogram_with_name <- function(list_objc) {
+  lapply(names(list_objc), function(x) {
+    hist(degree(list_objc[[x]]), main = paste(x), xlab = "Node Degree")
+  })
+}
+
+# Checks histogram of edge weight over lists of netwokrs. it is expected to be normal
+Weight_histogram_with_name <- function(list_objc) {
+  lapply(names(list_objc), function(x) {
+    hist(E(list_objc[[x]])$weight, main = paste(x), xlab = "Edge Weight")
+  })
+}
+
+# make the plots
+Degree_histogram_with_name(listed_igraph)
+Weight_histogram_with_name(listed_igraph)
+# *************************** Done!
+```
+
+
+
+#keep only the top 25% and bottom 25% of edges weights
+our network is too dense. let's remove some edges in the middle of the weight dsitribution
+```{r}
+
+#define funciton to filter igraph object based on edge weight
+fiter_on_weight<-function(igrap_obj){
+
+  #define quartiles of weights
+summary_weight<-E(igrap_obj)$weight%>%summary
+
+# remove weghts wihin second and thrd quartile, keeping only the 50% extremes
+filtered_igraph_obj<-
+  igrap_obj - E(igrap_obj)[E(igrap_obj)$weight >= summary_weight[2] & E(igrap_obj)$weight <= summary_weight[5]]
+
+
+#return filtered igraph object
+return(filtered_igraph_obj)
+
+}
+
+# appli funciton on igpa objects
+listed_igraph<-
+lapply(listed_igraph, fiter_on_weight)
+
+
+# re-make the plots
+Degree_histogram_with_name(listed_igraph)
+Weight_histogram_with_name(listed_igraph)
+
+```
+
+##### 6.5 - Compare against a random network
+
+Our network is useless if we can't tell it apart from a random network with the same number of nodes and edges. it is OK to ahve a few metrics in a few networks that are still similar to a random network, but pay attention and record this when selecting your cut-offs
+
+by changing parameters I improved from ~ 20 metrics similar to random to just 2 metrics similar to random.
+```{r}
+
+# The Real_VS_random_networks() custom function will compare the real network wiht 100 random networks, returning metrics that are different form random (average +/- SD) as TRUE
+
+# run the custom function on a a list of networks
+set.seed(101)
+list_random_VS_real_1000 <- map(listed_igraph, Real_VS_random_networks)
+
+as.data.frame(map(list_random_VS_real_1000, 2)) # is the real network different from the random network?
+
+
+#save output as flextble
+rand_network_ft<-
+lapply(list_random_VS_real_1000, function(x){
+  
+  # round metrics from networks
+  x[[1]]<-round(x[[1]], digits = 3)
+  
+  #add TURE/FALSE as a column
+  x[[1]][5,]<-x[[2]]
+  
+  #adjsut clumn names
+  output<-rownames_to_column(x[[1]],var = "network_id")
+  
+  #adjust TUR/FALSE in lat column
+  output[5,2:9]<-ifelse(output[5,2:9]==1, yes = "TRUE", no = "FALSE")
+  
+  #adjsut clumn names
+  output$network_id [5]<-"Is_real_network_different_from_random_network?"
+  
+  #save as flextable
+  output<-flextable(output)
+  
+  return(output)
+  
+})
+
+
+
+
+#save flextable as docx
+save_as_docx(values = rand_network_ft,
+             path = "./Results/random_netowrk_comparison_CONTROLS_VS_EXUVIAE.docx")
+
+
+
+# *************************** Done!
+```
+
+
+
+Pedro to do:
+* add plant biomass to network modules
+
+
+##### 6.6 - Define network node proprieties
+Now that we know our networks differ from random we can check their general proprieties. this can help us compare multiple different network we create, telling apart treatment or sample type effects ~ puttig the results on a PCA migt be a good idea.. also, check if your metrics increase or decrease according gradients you may have in your experiments
+
+At core/paths/shortest_paths.c:188 : Weight vector must be non-negative, got -0.126345. Invalid value
+```{r}
+
+# on a list of networks
+list_partial_network_metrics <- map(listed_igraph, Generate_RealNetworks_metrics)
+
+# we still have a few more metrics to add in the following chunks
+
+# *************************** Done!
+```
+
+
+###### 6.6.1 - Generate node metrics
+
+```{r}
+# The Generate_node_metrics2( custom) function will calculate a set of node metrics you may be interested in exploring
+
+node_metrics <- mapply(function(x, y) {
+  Generate_node_metrics2(x, y)
+},
+x = listed_igraph,
+y = ps_list_network,
+SIMPLIFY = FALSE
+)
+```
+
+
+
+###### 6.6.2 - Calculate Zi and Pi
+
+```{r}
+
+# The Zi_Pi_list() custom function will  will return a list, with Zi/Pi values for nodes as well as a count of module hubs (Zi>2.5) and connectors (Pi>0.62)  it will take ~40 sec to run on a network with 600 nodes and 1000 edges,
+
+# to a list of networks
+ZiPi_listed <- map(listed_igraph, Zi_Pi_list)
+
+
+# check Zi-Pi scatterplot
+
+lapply(ZiPi_listed, function(x) {
+  ggplot(x[[1]], aes(x = Zi, y = Pi)) +
+    geom_hline(yintercept = 0.62, linetype = "dashed", color = "red") +
+    geom_vline(xintercept = 2.5, linetype = "dashed", color = "red") +
+    geom_point()
+})
+
+
+
+# merges node emtrics with ZiPi
+node_metrics <- mapply(function(x, y) {
+  merge(x, # the Generate_node_metrics2() output
+    y[[1]][, c(1:2, 5:6)], # 4 columns of the ZiPi df of OTU metrics
+    by.x = 0, # merge by rownames for object x
+    by.y = "names", # merge by the collumn named "names" in object y
+    all.x = TRUE
+  )
+}, # keep rows even if they ahve data missing, in this case ZiPi outside the main component
+x = node_metrics,
+y = ZiPi_listed,
+SIMPLIFY = FALSE
+)
+
+
+
+# this will take the list with the number of connectors and hubs for each ntwork and add it to the main dataframe with netowr metrics
+list_network_metrics <- do.call(
+  rbind.data.frame,
+  Map(c, map(ZiPi_listed, 2), list_partial_network_metrics)
+)
+
+
+
+
+# save these network metrics externally
+write.csv(list_network_metrics, "./Results/network_metricsCONTROLS_VS_EXUVIAE.csv")
+```
+
+
+###### 6.6.3 - Dectect and label keystones
+
+```{r}
+
+# The KeystoneDetector3() custom function will plot keystones on a chart, besides providing a list of keystone species for your netowkr
+
+# run the custom function on a list
+library(ggrepel)
+keystone_list <- map(node_metrics, KeystoneDetector3)
+
+#rename node metric df
+complete_node_metrics<-node_metrics
+
+#export keystone detector plot
+network_Degree_Closeness_Betweeness<-
+ggarrange(keystone_list$bac_insct_field_ps[[1]],
+          keystone_list$bac_insct_pot_ps[[1]], ncol = 1, nrow = 2)
+
+ggsave(network_Degree_Closeness_Betweeness,filename = "./Results/network_Degree_Closeness_Betweeness_CONTROLS_VS_EXUVIAE.pdf", 
+       width = 110, 
+       height = 110, 
+       units = "mm")
+
+```
+
+###### 6.6.4 - add OTU abundances to the node metric dataframe
+
+Here we will add the OTU frequency under each treatment and niche to the node table. Will  be usefull on network visualization as we can regulate the size of nodes according their abundances
+
+```{r}
+
+############################################################################################################
+############################################################################################################
+############################################################################################################
+# I could not automate this step due to total brain failure on a friday afternoon. this code chunk is a nightmare!
+############################################################################################################
+############################################################################################################
+
+# get the total reads per treatments
+freq_per_treat<-
+  lapply(ps_list_network[1:2], function(x){
+    
+    Total_freq<-x%>%otu_table()%>%rowSums()
+    MW<-subset_samples(x, Treatment =="MW")%>%otu_table()%>%rowSums()
+    MAN<-subset_samples(x, Treatment =="MAN")%>%otu_table()%>%rowSums()
+    HC<-subset_samples(x, Treatment =="HC")%>%otu_table()%>%rowSums()
+    BSF<-subset_samples(x, Treatment =="BSF")%>%otu_table()%>%rowSums()
+    CHI<-subset_samples(x, Treatment =="CHI")%>%otu_table()%>%rowSums()
+    CO<-subset_samples(x, Treatment =="CO")%>%otu_table()%>%rowSums()
+    
+    
+    output<-data.frame(Total_freq,MW, MAN, HC, BSF, CHI, CO)
+    
+  return(output)
+  })
+  
+
+
+# add this total number of sequences to the node_metrics list
+complete_node_metrics <- mapply(function(x, y) {
+  merge(x, # the Generate_node_metrics2() output
+    y, # keeps only the ASV number and keystone definition
+    by.x = "Row.names", # merge by rownames for object x)
+    by.y = 0,
+    all.x = FALSE
+  )
+}, # keep rows even if they ahve data missing, in this case ZiPi outside the main component
+x = complete_node_metrics,
+y = freq_per_treat,
+SIMPLIFY = FALSE
+)
+
+
+
+
+
+```
+
+
+`
+
+
+##### 6.8 - Export network data
+we will now use the edge file to import it as a network file to cytoscape. then we can importe the node proprieties to the enw visualizations
+```{r}
+
+# remove NAs as they may crash cytoscape
+complete_node_metrics$bac_insct_field_ps[is.na(complete_node_metrics$bac_insct_field_ps)] <- ""
+complete_node_metrics$bac_insct_pot_ps[is.na(complete_node_metrics$bac_insct_pot_ps)] <- ""
+
+
+# save these network metrics externally. we will do this manually for only 4 networks
+write.csv(
+  x = complete_node_metrics$bac_insct_field_ps,
+  file = "./Results/Nodes_field_16weeks_CONTROLS_VS_EXUVIAE.csv",
+  quote = FALSE,
+  row.names = FALSE
+)
+write.csv(
+  x = igraph::as_data_frame(listed_igraph$bac_insct_field_ps),
+  file = "./Results/Edges_field_16weeks_CONTROLS_VS_EXUVIAE.csv",
+  quote = FALSE
+)
+
+write.csv(
+  x = complete_node_metrics$bac_insct_pot_ps,
+  file = "./Results/Nodes_pot_16weeks_CONTROLS_VS_EXUVIAE.csv",
+  quote = FALSE,
+  row.names = FALSE
+)
+write.csv(
+  x = igraph::as_data_frame(listed_igraph$bac_insct_pot_ps),
+  file = "./Results/Edges_pot_16weeks_CONTROLS_VS_EXUVIAE.csv",
+  quote = FALSE
+)
+```
+
+
+# define correlations of modules with biomas
+
+```{r}
+ps_list_network$bac_insct_field_ps@sam_data
+
+#load plant biomass data
+biomass<-read.csv2(file = "./Data/plant_biomass.csv", row.names = 1)
+
+#merge it with phyloseq metadata
+ps_list_network_meta<-
+lapply(ps_list_network, function(x){
+  biomass_ps<-sample_data(biomass)
+  x<-merge_phyloseq(x, biomass_ps)
+  return(x)
+})
+
+
+
+library("WGCNA")
+eing<-
+  mapply(function (x,y)
+  adjustInput_run_eigen_correlation_adjustOutput(
+    igraph_obj = x,
+    phyloseq_obj = y),
+  x = listed_igraph,
+  y = ps_list_network_meta,
+  SIMPLIFY = FALSE)
+
+# check correlation table
+lapply(eing, function(x) filter(x, nodes_in_module>2))
+
+
+
+```
+
+
+
+
+
+
+# define number of cross-kingdom interactions
+```{r}
+
+#remove field/pot netowrk names
+complete_node_metrics<-complete_node_metrics[1:2]
+########
+weighted_l_selected_insect_bac<-
+mapply(function(x,y){
+  
+  #turn edges into df
+edge_df<-
+  as_long_data_frame(x)
+
+#define alpha and gamma proteobac ASV
+Arthropoda_ASV<-
+ dplyr::filter(y, Phylum  == "Arthropoda")$OTU
+
+bacterial_ASV<-
+  dplyr::filter(y, Phylum != "Arthropoda")$OTU
+
+# define: TRUE + TRUE = ALPHA TO GAMA
+insect_bac<-data.frame(
+edge_df[,6] %in% Arthropoda_ASV,
+edge_df[,7] %in% bacterial_ASV)
+
+# define: TRUE + TRUE = GAMA TO ALPHA
+bac_insect<-data.frame(
+edge_df[,6] %in% bacterial_ASV, 
+edge_df[,7] %in% Arthropoda_ASV)
+
+bac_bac<-data.frame(
+edge_df[,6] %in% bacterial_ASV, 
+edge_df[,7] %in% bacterial_ASV)
+
+insect_insect<-data.frame(
+edge_df[,6] %in% Arthropoda_ASV, 
+edge_df[,7] %in% Arthropoda_ASV)
+
+# if alpha-gama  or gama-alpha connection, tag is as "alpha_gama", else tag it as "other"
+is_insect_bac_edge<-
+ifelse(test = insect_bac[,1] & insect_bac[,2] |
+              bac_insect[,1] & bac_insect [,2] ==TRUE, 
+       yes = "insect_bac",
+       no = ifelse (test = bac_bac[,1] & bac_bac[,2] ==TRUE,
+                    yes = "bac_bac",
+                    no = "insect_insect"))
+
+#save vector as edge propriety
+edge_attr(graph = x, 
+          name = "is_insect_bac_edge") <- is_insect_bac_edge
+
+#return graph
+return(as_long_data_frame(x))
+  
+},
+  x = listed_igraph,
+  y = complete_node_metrics,
+  SIMPLIFY = FALSE)
+
+
+#makea plot after flattening list and changing names
+weighted_l_selected_insect_bac_df<-
+  do.call(rbind, weighted_l_selected_insect_bac)%>%rownames_to_column()
+
+weighted_l_selected_insect_bac_df$rowname<-
+  gsub(pattern = "[0-9][0-9]", replacement = "", x = weighted_l_selected_insect_bac_df$rowname)
+
+weighted_l_selected_insect_bac_df$rowname<-
+  gsub(pattern = "[0-9]", replacement = "", x = weighted_l_selected_insect_bac_df$rowname)
+
+colnames(weighted_l_selected_insect_bac_df)[1]<-"treatment_type"
+
+#plot
+interkingdom_connection_plot<-
+  ggplot(data = weighted_l_selected_insect_bac_df, 
+         aes(x = is_insect_bac_edge, y = weight, fill = treatment_type))+
+           geom_boxplot()+
+        geom_dotplot(binaxis = "y", stackdir = "center", position = position_dodge(width = .75), dotsize = 0.075)+
+    facet_wrap(~positive_negative )
+  
+#save plot
+  ggsave(interkingdom_connection_plot,filename = "./Results/network_interkingdom_connections_plot_CONTROLS_VS_EXUVIAE.pdf", 
+       width = 180, 
+       height = 180, 
+       units = "mm")
+  
+
+  
+  
+  
+  #table of weights
+table_edge_type_freq<-
+lapply(weighted_l_selected_insect_bac, function(x)
+x%>%
+  group_by(is_insect_bac_edge, positive_negative)%>%
+  dplyr::summarise(n = n(),
+                   pct_edges = round(n()/nrow(x)*100, digits = 2),
+                   mean_weight = round(mean(weight), digits = 3))%>%
+  flextable())
+
+
+
+#save flextable as doc.x
+save_as_docx(values = table_edge_type_freq,
+             path = "./Results/network_interkingdom_connections_CONTROLS_VS_EXUVIAE.docx")
+
+
+```
 

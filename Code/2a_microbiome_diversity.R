@@ -67,6 +67,10 @@ save(physeq_rarefied_soiltype_l, file = "./Data/physeq_rarefied_soiltype_l.RData
 
 
 
+load(file = "./Data/physeq_rarefied_l.RData")
+load(file = "./Data/physeq_rarefied_soiltype_l.RData")
+
+
 
 
 

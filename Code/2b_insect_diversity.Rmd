@@ -636,23 +636,58 @@ return(output)
 
 
 # turn NA classifications into "", previewing their complete removal from the tree; add microbiome type as metadata
-insect_ps@tax_table@.Data[is.na(insect_ps@tax_table)]<-""
+#also reorders samples
+insect_ps<- 
+  lapply(list(insect_ps), function(x){
+    x@tax_table@.Data[is.na(x@tax_table)]<-""
+    
+    
+      #reorder samples
+      string_to_sort<-  sample_names(x)   
+          
+      # Create a custom order
+      custom_order <- c("CO", "MAN", "CHI", "BSF", "HC", "MW")
+      
+      # Extract the substring that you want to sort by (e.g., the part before the first dot)
+      substring_to_sort_by <- sub("^(.*?)_.*", "\\1", string_to_sort)
+      
+      # Use the custom order for sorting
+      sorted_strings <- string_to_sort[order(match(substring_to_sort_by, custom_order))]
+      
+      #reorder sample anmes according enw isntruction
+      otu_table(x) <- otu_table(x)[, sorted_strings]
+      
+      return(x)
 
-insect_ps_soil_l<- #NA to "" also for list of separated pot/field
+
+  })[[1]]
+insect_ps_soil_l<-
   lapply(insect_ps_soil_l, function(x){
     x@tax_table@.Data[is.na(x@tax_table)]<-""
-    return(x)
+    
+    
+      #reorder samples
+      string_to_sort<-  sample_names(x)   
+          
+      # Create a custom order
+      custom_order <- c("CO", "MAN", "CHI", "BSF", "HC", "MW")
+      
+      # Extract the substring that you want to sort by (e.g., the part before the first dot)
+      substring_to_sort_by <- sub("^(.*?)_.*", "\\1", string_to_sort)
+      
+      # Use the custom order for sorting
+      sorted_strings <- string_to_sort[order(match(substring_to_sort_by, custom_order))]
+      
+      #reorder sample anmes according enw isntruction
+      otu_table(x) <- otu_table(x)[, sorted_strings]
+      
+      return(x)
+
+
   })
 
-# rearrange order of samples so the groups are identical across the 3 heat trees
-sample_names_sorted<-sort(sample_names(insect_ps))
-otu_table(insect_ps) <- otu_table(insect_ps)[, sample_names_sorted]
 
-field_sample_names_sorted<-sort(sample_names(insect_ps_soil_l$Field))
-otu_table(insect_ps_soil_l$Field) <- otu_table(insect_ps_soil_l$Field)[, field_sample_names_sorted]
 
-pot_sample_names_sorted<-sort(sample_names(insect_ps_soil_l$Pot))
-otu_table(insect_ps_soil_l$Pot) <- otu_table(insect_ps_soil_l$Pot)[, pot_sample_names_sorted]
 
 
 #calculate and plot heat tree

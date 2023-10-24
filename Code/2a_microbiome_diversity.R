@@ -817,4 +817,46 @@ leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity)
   
   
   
+  # abudnances per genera
+  physeq_glom_genus_l<-lapply(physeq_rarefied_soiltype_l, function(x)
+    tax_glom(x, taxrank="Family"))
+  
+  melted_glom_genus_l<-lapply(physeq_glom_genus_l, function(x)
+    psmelt(x)%>%dplyr::filter(Family %in% c("f__Pseudomonadaceae", 
+                                                                       "f__Enterobacteriaceae", 
+                                                                       "f__Morganellaceae",
+                                                                       "f__Pectobacteriaceae",
+                                                                       "f__Erwiniaceae",
+                                                                       "f__Yersiniaceae", 
+                                                                       "f__Aeromonadaceae", 
+                                                                       "f__Clostridiaceae", 
+                                                                       "f__Planococcaceae", 
+                                                                       "f__Micrococcaceae",
+                                                                       "f__Bacillaceae",
+                                                                       "f__Comamonadaceae",
+                                                                       "f__Moraxellaceae",
+                                                                       "f__Sphingomonadaceae",
+                                                                       "f__Rhizobiaceae",
+                                                                       "f__Xanthomonadaceae")))
+           
+           
+           
+  summary_l<-lapply(melted_glom_genus_l, function(x)         
+  x%>%
+    dplyr::group_by(Treatment, Family)%>%
+    dplyr::summarise(mean_abund = mean(Abundance),
+                     median_abund = median(Abundance),
+                     sd = sd(Abundance)))
+  
+
+  
+library(tidyr)
+  field_fam_table<-
+    pivot_wider(summary_l$Field, names_from = Treatment, values_from = c(mean_abund, median_abund ,sd ))
+  
+  pot_fam_table<-
+    pivot_wider(summary_l$Pot, names_from = Treatment, values_from = c(mean_abund, median_abund ,sd ))
+  
+  write.csv2(x = field_fam_table, file = "./Results/Field_all_ASVs_from_selected_families.csv")
+  write.csv2(x = pot_fam_table, file = "./Results/Pot_all_ASVs_from_selected_families.csv")  
   

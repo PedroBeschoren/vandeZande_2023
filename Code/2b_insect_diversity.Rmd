@@ -537,6 +537,8 @@ library(tibble)
 library(tidyverse)
 ```
 
+
+
 ```{r}
 phyloseq_to_heat_tree_matrix<-function(ps_object, sample_group){
   
@@ -730,5 +732,38 @@ ggsave(heat_tree_insect_l$Pot, filename = "./Results/insect_heat_tree_pot.pdf",
 
 
 
+```
+
+# summary table by genera
+```{r}
+
+  # abudnances per genera
+  insect_physeq_glom_genus_l<-lapply(insect_ps_soil_l, function(x)
+    tax_glom(x, taxrank="Genus"))
+  
+  insect_melted_glom_genus_l<-lapply(insect_physeq_glom_genus_l, function(x)
+    psmelt(x))
+           
+           
+           
+  insect_summary_l<-lapply(insect_melted_glom_genus_l, function(x)         
+  x%>%
+    dplyr::group_by(Treatment, Family)%>%
+    dplyr::summarise(mean_abund = mean(Abundance),
+                     median_abund = median(Abundance),
+                     sd = sd(Abundance)))
+  
+
+  
+library(tidyr)
+  insect_field_fam_table<-
+    pivot_wider(insect_summary_l$Field, names_from = Treatment, values_from = c(mean_abund, median_abund ,sd ))
+  
+  insect_pot_fam_table<-
+    pivot_wider(insect_summary_l$Pot, names_from = Treatment, values_from = c(mean_abund, median_abund ,sd ))
+  
+  write.csv2(x = insect_field_fam_table, file = "./Results/Field_insect_genera.csv")
+  write.csv2(x = insect_pot_fam_table, file = "./Results/Pot_insect_genera.csv")  
+  
 ```
 

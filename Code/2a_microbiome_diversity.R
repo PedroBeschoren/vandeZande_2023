@@ -843,7 +843,7 @@ leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity)
            
   summary_l<-lapply(melted_glom_genus_l, function(x)         
   x%>%
-    dplyr::group_by(Treatment, Family)%>%
+    dplyr::group_by(Treatment, Family,Time_point)%>%
     dplyr::summarise(mean_abund = mean(Abundance),
                      median_abund = median(Abundance),
                      sd = sd(Abundance)))
@@ -852,10 +852,10 @@ leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity)
   
 library(tidyr)
   field_fam_table<-
-    pivot_wider(summary_l$Field, names_from = Treatment, values_from = c(mean_abund, median_abund ,sd ))
+    pivot_wider(summary_l$Field, names_from = c(Treatment, Time_point), values_from = c(mean_abund, median_abund ,sd ))
   
   pot_fam_table<-
-    pivot_wider(summary_l$Pot, names_from = Treatment, values_from = c(mean_abund, median_abund ,sd ))
+    pivot_wider(summary_l$Pot, names_from = c(Treatment, Time_point), values_from = c(mean_abund, median_abund,sd))
   
   write.csv2(x = field_fam_table, file = "./Results/Field_all_ASVs_from_selected_families.csv")
   write.csv2(x = pot_fam_table, file = "./Results/Pot_all_ASVs_from_selected_families.csv")  

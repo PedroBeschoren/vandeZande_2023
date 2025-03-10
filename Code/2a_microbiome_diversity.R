@@ -289,7 +289,7 @@ permanova_with_blocks <- function(phyloseq_list, rhs_model) {
     form <- as.formula(paste("lhs_data~", paste(rhs_model_in))) # getting the formulat properly evaluated as custom string is tricky
     output <- adonis2(form,
                       data = as(sample_data(x), "data.frame"), # changing with as.data.frame is insufficient
-                      permutations = how(within = Within(type = "free"), nperm = 9999)
+                      permutations = how(within = Within(type = "series"), nperm = 9999)
     ) # how defines the permutations, it is important to adjust it to the experimental design such as a time series
     return(output)
   })
@@ -556,10 +556,17 @@ physeq_rarefied
 library(microbiome)
 # calculate diversity in topsoils
 
-  taxon_diversity<-microbiome::diversity(physeq_rarefied,index = "Shannon")
+  taxon_diversity<-microbiome::diversity(physeq_rarefied,index = "all")
   merg_to_ps<-sample_data(taxon_diversity) 
   taxon_diversity<-as(sample_data(merge_phyloseq(physeq_rarefied,merg_to_ps)),"data.frame") 
-
+  taxon_diversity$block<-  taxon_diversity$Sample_Name
+  
+more_alpha_div<-estimate_richness(physeq_rarefied)
+more_alpha_div<-rownames_to_column(more_alpha_div, var = "Sample_Name_matches")
+taxon_diversity<-rownames_to_column(taxon_diversity, var = "Sample_Name_matches")
+taxon_diversity<-left_join(taxon_diversity, more_alpha_div)
+  
+  
 
 # plot diversity from topsoils
 shannon_topsoil_plot<-
@@ -579,7 +586,56 @@ ggsave(shannon_topsoil_plot, filename = "./Results/shannon_plot.pdf",
        units = "mm")
 
 
+# plot diversity from topsoils
+shannon_topsoil_plot<-
+  ggplot(taxon_diversity, aes(x =Time_point , y = fisher , fill=Treatment))+
+  geom_boxplot(alpha = 0.4, outlier.shape = NA)+
+  geom_dotplot(binaxis = "y", stackdir = "center", position = position_dodge(width = .75), dotsize = 0.3)+
+  theme_bw()+
+  scale_fill_manual(values=pallete_els)+
+  labs(title = "Fisher  diversity")+
+  ylab("Fisher diversity index")+
+  xlab("Time points")+
+  facet_wrap(~Soil_type)
+#save shannon plot
+ggsave(shannon_topsoil_plot, filename = "./Results/fisher_plot.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
+
+
+# plot diversity from topsoils
+shannon_topsoil_plot<-
+  ggplot(taxon_diversity, aes(x =Time_point , y = Observed , fill=Treatment))+
+  geom_boxplot(alpha = 0.4, outlier.shape = NA)+
+  geom_dotplot(binaxis = "y", stackdir = "center", position = position_dodge(width = .75), dotsize = 0.3)+
+  theme_bw()+
+  scale_fill_manual(values=pallete_els)+
+  labs(title = "Observed number of taxa")+
+  ylab("Observed number of taxa")+
+  xlab("Time points")+
+  facet_wrap(~Soil_type)
+#save shannon plot
+ggsave(shannon_topsoil_plot, filename = "./Results/fisher_plot.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
+
+
+
+
 ########## alpha diversity test ####
+
+### nwe: mixed models####
+library(lme4)
+library(lmerTest)
+
+physeq_rarefied_soiltype_l
+
+
+model <- lmer(shannon ~ Treatment  * Soil_type * Time + (1 | Block), data = taxon_diversity)
 
 
 # check homogeniety of variances in alpha diversity

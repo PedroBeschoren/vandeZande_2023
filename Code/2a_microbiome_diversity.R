@@ -51,7 +51,7 @@ physeq_rarefied <- rarefy_even_depth(
 
 #adjsut order of treatment factors, pallete
 physeq_rarefied@sam_data$Treatment<-
-factor(physeq_rarefied@sam_data$Treatment, levels = c("Control", "Manure", "Chitin", "BSF", "HC", "MW"))
+factor(physeq_rarefied@sam_data$Treatment, levels = c("CO", "MAN", "CHI", "BSF", "HC", "MW"))
 pallete_els<-c("#000000", "#767171", "#AFABAB","#2F5597","#FFC000","#548235")
 
 #separate phyloseq objects
@@ -69,7 +69,6 @@ save(physeq_rarefied_soiltype_l, file = "./Data/physeq_rarefied_soiltype_l.RData
 
 load(file = "./Data/physeq_rarefied_l.RData")
 load(file = "./Data/physeq_rarefied_soiltype_l.RData")
-
 
 
 
@@ -617,14 +616,24 @@ shannon_topsoil_plot<-
   xlab("Time points")+
   facet_wrap(~Soil_type)
 #save shannon plot
-ggsave(shannon_topsoil_plot, filename = "./Results/fisher_plot.pdf",
+ggsave(shannon_topsoil_plot, filename = "./Results/observedTaxa_plot.pdf",
        width = 180,
        height = 180,
        units = "mm")
 
 
+taxon_diversity$time_point_numeric<-gsub(x = taxon_diversity$Time_point, pattern ="Week.", replacement = "") %>% as.numeric()
+# plot diversity from topsoils
+shannon_loess_plot <- ggplot(taxon_diversity, aes(x = time_point_numeric, y = fisher, color = Treatment, fill = Treatment)) +
+  geom_jitter(width = 0.5) +
+  stat_smooth(geom = "ribbon", method = "loess", alpha = 0.2, se = TRUE, fullrange = FALSE, color = NA) + # Added fill = Treatment and color = NA
+  geom_smooth(method = "loess", se = FALSE, fullrange = FALSE) + # Added line without SE
+  theme_bw() +
+  scale_color_manual(values = pallete_els) +
+  scale_fill_manual(values = pallete_els) +
+  facet_wrap(~ Soil_type+Treatment)
 
-
+shannon_loess_plot
 
 ########## alpha diversity test ####
 

@@ -165,10 +165,50 @@ physeq<-merge_phyloseq(physeq_pot_newnames, physeq_field_newnames)
 #laod metadata
 metadata <- read.csv2(file = "./Data/metadata.csv", row.names = 3)
 metadata$Time_point<-factor(x = metadata$Time_point, levels = c("Week.4", "Week.8", "Week.12", "Week.16"))
+
+
+block_info<-
+read.delim(file = "./Data/Metadata_field_herbivore_observationscsv_2021.csv",sep = ";")
+
+metadata$Plant_Number<-
+gsub(pattern = ".*_p", x =metadata$Sample_Name, replacement = "")%>%
+  gsub(pattern = ".*_P", replacement = "")%>%
+  gsub(pattern = ".*_f", replacement = "")%>%
+  gsub(pattern = ".*_F", replacement = "")%>%
+  gsub(pattern = "_.*",replacement = "")%>%as.numeric
+
+
+metadata$Harvest<-
+gsub(pattern = "Week.", x =metadata$Time_point , replacement = "")%>%
+  as.numeric()
+
+block_info<-
+select(block_info, -Observation, -Column, -Row, - Label )%>%unique()
+
+metadata$Treatment<-
+  gsub(pattern = "Control", x = metadata$Treatment, replacement = "CO")%>%
+      gsub(pattern = "Manure", replacement = "MAN")%>%
+      gsub(pattern = "Chitin", replacement = "CHI")
+
+
+metadata_join<-
+left_join(metadata, block_info, by = join_by("Plant_Number" == "Plant_Number", 
+                                             "Treatment"=="Treatment", 
+                                             "Soil_type" == "Soil",
+                                             "Harvest" == "Harvest"))
+
+
+
 metadata <-sample_data(metadata)
 
 # add metadata to phyloseq object with updated taxa names
 sample_data(physeq)<-metadata
+
+
+
+
+
+
 
 #save the phyloseq object externally
 save(physeq, file = "./Data/physeq_merged_renamed_pot_field_ASVs.RData")

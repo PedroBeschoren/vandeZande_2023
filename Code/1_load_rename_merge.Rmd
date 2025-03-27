@@ -197,12 +197,14 @@ left_join(metadata, block_info, by = join_by("Plant_Number" == "Plant_Number",
                                              "Soil_type" == "Soil",
                                              "Harvest" == "Harvest"))
 
+rownames(metadata_join)<-rownames(metadata)
+
+metadata_for_ps <-sample_data(metadata_join)
 
 
-metadata <-sample_data(metadata)
 
 # add metadata to phyloseq object with updated taxa names
-sample_data(physeq)<-metadata
+sample_data(physeq)<-metadata_for_ps
 
 
 

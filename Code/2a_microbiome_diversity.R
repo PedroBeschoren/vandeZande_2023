@@ -315,8 +315,8 @@ permanova_to_flextable <- function (permanova_with_blocks_output){
 }
 
 permanova_tables<-permanova_with_blocks(phyloseq_list = physeq_rarefied_l,
-                                        rhs_model = "Treatment+")
-
+                                        rhs_model = "Treatment + Block")
+physeq_rarefied_l$Field.Week.4@sam_data
 # save and export as flextable
 library("flextable")
 library(tibble)

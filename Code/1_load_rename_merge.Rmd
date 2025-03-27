@@ -199,6 +199,7 @@ left_join(metadata, block_info, by = join_by("Plant_Number" == "Plant_Number",
 
 rownames(metadata_join)<-rownames(metadata)
 
+write.table(x = metadata, file = "./Data/Els_please_check_NAblocks.csv", sep = ";")
 metadata_for_ps <-sample_data(metadata_join)
 
 

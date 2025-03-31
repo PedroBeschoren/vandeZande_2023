@@ -167,10 +167,7 @@ physeq<-merge_phyloseq(physeq_pot_newnames, physeq_field_newnames)
 block_info<-
 read.delim(file = "./Data/Plant names with blocks.csv",sep = ";", row.names = 1)
 
-
-rownames(block_info)<-rownames(block_info$Sample_Name)
-
-
+block_info$Block<-as.factor(block_info$Block)
 
 
 # add metadata to phyloseq object with updated taxa names

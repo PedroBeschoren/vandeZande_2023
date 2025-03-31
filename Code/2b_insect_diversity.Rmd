@@ -240,7 +240,7 @@ permanova_with_blocks <- function(phyloseq_list, rhs_model) {
   })
 }
 
-permanova_tables<-permanova_with_blocks(phyloseq_list = insect_ps_soil_l, rhs_model = "Treatment*Observation")
+permanova_tables<-permanova_with_blocks(phyloseq_list = insect_ps_soil_l, rhs_model = "Treatment*Observation+Block")
 
 
 library("flextable")

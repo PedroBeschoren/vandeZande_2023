@@ -507,7 +507,7 @@ ggsave(focal_line_plot, filename = "./Results/comparison_lineplot_pairwise_perma
 
 ##### permanova of mirobiome with treatment*time in pot and field samples in separate
 
-permanova_tables2<-permanova_with_blocks(phyloseq_list = physeq_rarefied_soiltype_l ,rhs_model = "Treatment*Time_point")
+permanova_tables2<-permanova_with_blocks(phyloseq_list = physeq_rarefied_soiltype_l ,rhs_model = "Treatment*Time_point+Block")
 
 
 
@@ -681,19 +681,17 @@ library(lmerTest)
 
 physeq_rarefied_soiltype_l
 
-
-model <- lmer(shannon ~ Treatment  * Soil_type * Time + (1 | Block), data = taxon_diversity)
-
+taxon_diversity$Block<-as.factor(taxon_diversity$Block)
 
 # check homogeniety of variances in alpha diversity
 library(car)
 library(agricolae)
-leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity) 
+leveneTest((shannon) ~ Treatment*Soil_type*Time_point*Block, data = taxon_diversity) 
 
 #two-way anova, shanon diversity index
   tx <- with(taxon_diversity, interaction(Treatment,Soil_type,Time_point)) #needed for tukey to test interaction
   aovTukey<-aov(shannon ~ tx, data = taxon_diversity)#needed for tukey to test interaction
-  anova_test<-Anova(lm((shannon) ~Treatment*Soil_type*Time_point, data = taxon_diversity, contrasts=list(Treatment=contr.sum, Soil_type=contr.sum, Time_point = contr.sum)), type = "2") 
+  anova_test<-Anova(lm((shannon) ~Treatment*Soil_type*Time_point+Block, data = taxon_diversity, contrasts=list(Treatment=contr.sum, Soil_type=contr.sum, Time_point = contr.sum)), type = "2") 
   out_tuk<-HSD.test(aovTukey, trt = "tx")
   tukey_group_ft<-flextable(rownames_to_column(out_tuk$groups, var = "Factor"))
   
@@ -709,7 +707,7 @@ leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity)
   
   #flextable of pairwside comparsions
   save_as_docx(anova_test_ft,
-               path = "./Results/shannon_anova_microbiome.docx")
+               path = "./Results/shannon_anova_microbiome_with_blocks.docx")
   save_as_docx(tukey_group_ft,
                path = "./Results/shannon_anova_microbiome_tukey.docx")
   
@@ -736,7 +734,7 @@ leveneTest((shannon) ~ Treatment*Soil_type*Time_point, data = taxon_diversity)
       #two-way anova, shanon diversity index
       tx <- with(taxon_diversity, interaction(Treatment)) #needed for tukey to test interaction
       aovTukey<-aov(shannon ~ tx, data = taxon_diversity)#needed for tukey to test interaction
-      anova_test<-Anova(lm((shannon) ~Treatment, data = taxon_diversity, contrasts=list(Treatment=contr.sum)), type = "2") 
+      anova_test<-Anova(lm((shannon) ~Treatment+Block, data = taxon_diversity, contrasts=list(Treatment=contr.sum)), type = "2") 
       out_tuk<-HSD.test(aovTukey, trt = "tx")
       tukey_group_ft<-flextable(rownames_to_column(out_tuk$groups, var = "Factor"))
       

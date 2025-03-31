@@ -625,16 +625,53 @@ ggsave(shannon_topsoil_plot, filename = "./Results/observedTaxa_plot.pdf",
 
 taxon_diversity$time_point_numeric<-gsub(x = taxon_diversity$Time_point, pattern ="Week.", replacement = "") %>% as.numeric()
 # plot diversity from topsoils
-shannon_loess_plot <- ggplot(taxon_diversity, aes(x = time_point_numeric, y = fisher, color = Treatment, fill = Treatment)) +
+fisherloess_plot <- ggplot(taxon_diversity, aes(x = time_point_numeric, y = fisher, color = Treatment, fill = Treatment)) +
   geom_jitter(width = 0.5) +
   stat_smooth(geom = "ribbon", method = "loess", alpha = 0.2, se = TRUE, fullrange = FALSE, color = NA) + # Added fill = Treatment and color = NA
   geom_smooth(method = "loess", se = FALSE, fullrange = FALSE) + # Added line without SE
   theme_bw() +
   scale_color_manual(values = pallete_els) +
   scale_fill_manual(values = pallete_els) +
+  xlab("Time points")+
+  ylab("Fisher diversity index")+
   facet_wrap(~ Soil_type)
 
+ggsave(fisherloess_plot, filename = "./Results/fisher_loess_plot.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
 
+Shannon_loess_plot <- ggplot(taxon_diversity, aes(x = time_point_numeric, y = Shannon, color = Treatment, fill = Treatment)) +
+  geom_jitter(width = 0.5) +
+  stat_smooth(geom = "ribbon", method = "loess", alpha = 0.2, se = TRUE, fullrange = FALSE, color = NA) + # Added fill = Treatment and color = NA
+  geom_smooth(method = "loess", se = FALSE, fullrange = FALSE) + # Added line without SE
+  theme_bw() +
+  xlab("Time points")+
+  ylab("Shannon diversity index")
+  scale_color_manual(values = pallete_els) +
+  scale_fill_manual(values = pallete_els) +
+  facet_wrap(~ Soil_type)
+
+ggsave(Shannon_loess_plot, filename = "./Results/Shannon_loess_plot.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
+observed_loess_plot <- ggplot(taxon_diversity, aes(x = time_point_numeric, y = Observed, color = Treatment, fill = Treatment)) +
+  geom_jitter(width = 0.5) +
+  stat_smooth(geom = "ribbon", method = "loess", alpha = 0.2, se = TRUE, fullrange = FALSE, color = NA) + # Added fill = Treatment and color = NA
+  geom_smooth(method = "loess", se = FALSE, fullrange = FALSE) + # Added line without SE
+  theme_bw() +
+  xlab("Time points")+
+  ylab("Observed number of taxa")+
+scale_color_manual(values = pallete_els) +
+  scale_fill_manual(values = pallete_els) +
+  facet_wrap(~ Soil_type)
+
+ggsave(observed_loess_plot, filename = "./Results/observed_loess_plot.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
 
 ########## alpha diversity test ####
 

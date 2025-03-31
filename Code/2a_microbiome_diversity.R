@@ -315,8 +315,8 @@ permanova_to_flextable <- function (permanova_with_blocks_output){
 }
 
 permanova_tables<-permanova_with_blocks(phyloseq_list = physeq_rarefied_l,
-                                        rhs_model = "Treatment + Block")
-physeq_rarefied_l$Field.Week.4@sam_data
+                                        rhs_model = "Treatment+Block")
+
 # save and export as flextable
 library("flextable")
 library(tibble)
@@ -360,7 +360,7 @@ save_as_docx(flextable_l$Field.Week.4,
 
 # compare field sampls to pot samples (simple model with all samples
 permanova_tables_b<-permanova_with_blocks(phyloseq_list = list(physeq_rarefied),
-                                        rhs_model = "Treatment*Soil_type*Time_point")
+                                        rhs_model = "Treatment*Soil_type*Time_point+Block")
 
 all_samples_model<-permanova_to_flextable(permanova_tables_b)
 
@@ -370,7 +370,7 @@ save_as_docx(all_samples_model,
 
 # compare field and soil at each time point
 permanova_tables_c<-permanova_with_blocks(phyloseq_list = physeq_rarefied_time_l,
-                                          rhs_model = "Treatment*Soil_type")
+                                          rhs_model = "Treatment*Soil_type+Block")
 
 split_by_time_model<-lapply(permanova_tables_c, permanova_to_flextable)
 
@@ -383,7 +383,7 @@ save_as_docx(split_by_time_model,
 
 # compare soil time under each time point and treatment
 permanova_tables_d<-permanova_with_blocks(phyloseq_list = physeq_rarefied_time_treatment_l,
-                                          rhs_model = "Soil_type")
+                                          rhs_model = "Soil_type+Block")
 
 
 split_by_time_treatment_model<-lapply(permanova_tables_d, permanova_to_flextable)
@@ -632,9 +632,9 @@ shannon_loess_plot <- ggplot(taxon_diversity, aes(x = time_point_numeric, y = fi
   theme_bw() +
   scale_color_manual(values = pallete_els) +
   scale_fill_manual(values = pallete_els) +
-  facet_wrap(~ Soil_type+Treatment)
+  facet_wrap(~ Soil_type)
 
-shannon_loess_plot
+
 
 ########## alpha diversity test ####
 

@@ -163,12 +163,19 @@ physeq<-merge_phyloseq(physeq_pot_newnames, physeq_field_newnames)
 
 
 #laod metadata
+
 metadata <- read.csv2(file = "./Data/metadata.csv", row.names = 3)
 metadata$Time_point<-factor(x = metadata$Time_point, levels = c("Week.4", "Week.8", "Week.12", "Week.16"))
 
 
 block_info<-
 read.delim(file = "./Data/Metadata_field_herbivore_observationscsv_2021.csv",sep = ";")
+
+
+block_info<-
+read.delim(file = "./Data/Plant names with blocks.csv",sep = ";", row.names = 1)
+
+#block_info <- read.csv2("./Data/Metadata_field_herbivore_observationscsv_2021.csv")
 
 metadata$Plant_Number<-
 gsub(pattern = ".*_p", x =metadata$Sample_Name, replacement = "")%>%
@@ -197,18 +204,15 @@ left_join(metadata, block_info, by = join_by("Plant_Number" == "Plant_Number",
                                              "Soil_type" == "Soil",
                                              "Harvest" == "Harvest"))
 
-rownames(metadata_join)<-rownames(metadata)
+rownames(block_info)<-rownames(block_info$Sample_Name)
 
-write.table(x = metadata, file = "./Data/Els_please_check_NAblocks.csv", sep = ";")
-metadata_for_ps <-sample_data(metadata_join)
+block_info
 
+metadata_join$Block
 
 
 # add metadata to phyloseq object with updated taxa names
-sample_data(physeq)<-metadata_for_ps
-
-
-
+sample_data(physeq)<-block_info
 
 
 

@@ -138,6 +138,25 @@ ggsave(NMDS_all_samples3, filename = "./Results/NMDS_all_samples3.pdf",
        height = 180,
        units = "mm")
 
+# requests from April 2025
+NMDS_all_samples4<-plot_ordination(
+  physeq = physeq_rarefied,
+  ordination = nmds_rootAndSoil,
+  color = "Treatment",
+  shape = "Time_point") +
+  theme_classic() +
+  scale_shape_manual(values=c(0, 15, 1, 19))+
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5)) +
+  geom_point(alpha = 1, size = 2.5) +
+  theme(legend.position = "right")+
+  scale_color_manual(values=pallete_els)+
+  facet_wrap(~Soil_type)
+
+ggsave(NMDS_all_samples4, filename = "./Results/NMDS_all_samples4.pdf",
+       width = 180,
+       height = 180,
+       units = "mm")
+
 
 
 # define custom function to plot a list of NMDS results

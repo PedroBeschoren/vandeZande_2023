@@ -1,0 +1,162 @@
+> permanova_pairwise_with_blocks_field<-
++   pairwiseAdonis::pairwise.adonis2(phyloseq::distance(otu_table(physeq_rarefied_soiltype_l[[1]]), 
++                                       method="bray") ~ Treatment*Time_point, 
++                    data = as(phyloseq::sample_data(physeq_rarefied_soiltype_l[[1]]),
++                              "data.frame"), 
++                    strata='Block')
+> permanova_pairwise_with_blocks_field
+$parent_call
+[1] "phyloseq::distance(otu_table(physeq_rarefied_soiltype_l[[1]]), method = \"bray\") ~ Treatment * Time_point , strata = Block , permutations 999"
+
+$CO_vs_MAN
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.4378 0.02504  2.8621  0.004 ** 
+Time_point            3   5.8049 0.33204 12.6485  0.001 ***
+Treatment:Time_point  3   0.9902 0.05664  2.1576  0.001 ***
+Residual             67  10.2497 0.58628                   
+Total                74  17.4827 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$CO_vs_CHI
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.2412 0.01457  1.5938  0.097 .  
+Time_point            3   5.9954 0.36213 13.2045  0.001 ***
+Treatment:Time_point  3   0.7847 0.04739  1.7281  0.007 ** 
+Residual             63   9.5349 0.57591                   
+Total                70  16.5562 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$CO_vs_BSF
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.4294 0.02434  2.8692  0.003 ** 
+Time_point            3   6.2584 0.35475 13.9384  0.001 ***
+Treatment:Time_point  3   0.9259 0.05249  2.0622  0.002 ** 
+Residual             67  10.0277 0.56842                   
+Total                74  17.6414 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$CO_vs_HC
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.3817 0.02104  2.4094  0.013 *  
+Time_point            3   6.3223 0.34852 13.3031  0.001 ***
+Treatment:Time_point  3   0.8223 0.04533  1.7303  0.009 ** 
+Residual             67  10.6140 0.58510                   
+Total                74  18.1404 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$CO_vs_MW
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.3937 0.02335  2.5981  0.008 ** 
+Time_point            3   5.3008 0.31447 11.6614  0.001 ***
+Treatment:Time_point  3   1.0099 0.05991  2.2217  0.001 ***
+Residual             67  10.1518 0.60226                   
+Total                74  16.8561 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$MAN_vs_CHI
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.3384 0.01993  2.1721  0.018 *  
+Time_point            3   5.3767 0.31671 11.5044  0.001 ***
+Treatment:Time_point  3   0.9797 0.05771  2.0962  0.002 ** 
+Residual             66  10.2818 0.60565                   
+Total                73  16.9765 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$MAN_vs_BSF
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.4424 0.02461  2.8743  0.005 ** 
+Time_point            3   5.5306 0.30764 11.9770  0.001 ***
+Treatment:Time_point  3   1.2299 0.06841  2.6635  0.001 ***
+Residual             70  10.7746 0.59934                   
+Total                77  17.9775 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$MAN_vs_HC
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.3986 0.02157  2.4562  0.012 *  
+Time_point            3   5.7742 0.31245 11.8592  0.001 ***
+Treatment:Time_point  3   0.9467 0.05123  1.9444  0.002 ** 
+Residual             70  11.3609 0.61475                   
+Total                77  18.4805 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$MAN_vs_MW
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.3511 0.02049  2.2547  0.012 *  
+Time_point            3   4.9161 0.28687 10.5249  0.001 ***
+Treatment:Time_point  3   0.9708 0.05665  2.0784  0.003 ** 
+Residual             70  10.8987 0.63599                   
+Total                77  17.1366 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$CHI_vs_BSF
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.3743 0.02179  2.4558  0.010 ** 
+Time_point            3   5.5921 0.32551 12.2296  0.001 ***
+Treatment:Time_point  3   1.1534 0.06714  2.5223  0.001 ***
+Residual             66  10.0598 0.58557                   
+Total                73  17.1796 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$CHI_vs_HC
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.3612 0.02039  2.2392  0.013 *  
+Time_point            3   5.5641 0.31412 11.4981  0.001 ***
+Treatment:Time_point  3   1.1418 0.06446  2.3595  0.001 ***
+Residual             66  10.6462 0.60103                   
+Total                73  17.7132 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$CHI_vs_MW
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.2505 0.01536  1.6232  0.082 .  
+Time_point            3   4.8616 0.29814 10.5024  0.001 ***
+Treatment:Time_point  3   1.0102 0.06195  2.1824  0.001 ***
+Residual             66  10.1839 0.62454                   
+Total                73  16.3062 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$BSF_vs_HC
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.4367 0.02337  2.7445  0.006 ** 
+Time_point            3   6.1702 0.33021 12.9251  0.001 ***
+Treatment:Time_point  3   0.9399 0.05030  1.9689  0.002 ** 
+Residual             70  11.1389 0.59612                   
+Total                77  18.6857 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$BSF_vs_MW
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.2532 0.01472  1.6601  0.057 .  
+Time_point            3   5.3270 0.30960 11.6418  0.001 ***
+Treatment:Time_point  3   0.9491 0.05516  2.0742  0.003 ** 
+Residual             70  10.6767 0.62052                   
+Total                77  17.2059 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+$HC_vs_MW
+                     Df SumOfSqs      R2       F Pr(>F)    
+Treatment             1   0.4364 0.02433  2.7122  0.004 ** 
+Time_point            3   5.3641 0.29907 11.1127  0.001 ***
+Treatment:Time_point  3   0.8723 0.04864  1.8072  0.005 ** 
+Residual             70  11.2630 0.62796                   
+Total                77  17.9358 1.00000                   
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+attr(,"class")
+[1] "pwadstrata" "list"   

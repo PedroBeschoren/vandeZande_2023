@@ -15,7 +15,6 @@ library(mia)
 
 # load phyloseq object with adjsuted and emrged ASV names (fixing macrogen's inadequate bioinformatics)
 load(file = "./Data/physeq_merged_renamed_pot_field_ASVs.RData")
-physeq
 
 
 #remove rare ASVs
@@ -563,11 +562,23 @@ save_as_docx(flextable_l2$Field,
 
 
 
+### pairwise adonis (permanova posthoc) via pairwiseAdonis::pairwise.adonis2 ####
+install.packages("flextable")
+library("pairwiseAdonis")
 
+permanova_pairwise_with_blocks_field<-
+  pairwiseAdonis::pairwise.adonis2(phyloseq::distance(otu_table(physeq_rarefied_soiltype_l[[1]]), 
+                                      method="bray") ~ Treatment*Time_point, 
+                   data = as(phyloseq::sample_data(physeq_rarefied_soiltype_l[[1]]),
+                             "data.frame"), 
+                   strata='Block')
 
-
-
-
+permanova_pairwise_with_blocks_pot<-
+  pairwiseAdonis::pairwise.adonis2(phyloseq::distance(otu_table(physeq_rarefied_soiltype_l[[2]]), 
+                                                      method="bray") ~ Treatment*Time_point, 
+                                   data = as(phyloseq::sample_data(physeq_rarefied_soiltype_l[[2]]),
+                                             "data.frame"), 
+                                   strata='Block')
 
 ########## alpha diversity plot ####
 
